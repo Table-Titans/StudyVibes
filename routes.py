@@ -1,4 +1,5 @@
 from datetime import datetime
+from sqlalchemy import inspect
 
 from flask import render_template, request, redirect, url_for, flash, jsonify, abort
 from werkzeug.utils import secure_filename
@@ -11,22 +12,29 @@ from tests.tag_data import test_tags, test_session_tags
 from tests.resource_data import test_resources
 from tests.reminder_data import test_reminders
 
-def register_routes(app):
+
+def register_routes(app, db):
 
     def find_course(course_id):
         if not course_id:
             return None
-        return next((course for course in test_course_offerings if course['id'] == course_id), None)
+        return next(
+            (course for course in test_course_offerings if course["id"] == course_id),
+            None,
+        )
 
     def find_location(location_id):
         if not location_id:
             return None
-        return next((location for location in test_locations if location['id'] == location_id), None)
+        return next(
+            (location for location in test_locations if location["id"] == location_id),
+            None,
+        )
 
     def find_session(session_id):
         for collection in (my_sessions, join_sessions):
             for session in collection:
-                if session['id'] == session_id:
+                if session["id"] == session_id:
                     return session
         return None
 
@@ -73,51 +81,57 @@ def register_routes(app):
             return None
 
         session_copy = dict(session_record)
-        course = find_course(session_copy.get('course_id'))
-        location = find_location(session_copy.get('location_id'))
+        course = find_course(session_copy.get("course_id"))
+        location = find_location(session_copy.get("location_id"))
 
         # Prefer explicit start/end times; fall back to generic time if needed
-        start_display = session_copy.get('start_time')
-        end_display = session_copy.get('end_time')
+        start_display = session_copy.get("start_time")
+        end_display = session_copy.get("end_time")
         if start_display and "T" in start_display:
             start_display = format_datetime_string(start_display)
         if end_display and "T" in end_display:
             end_display = format_datetime_string(end_display)
 
         if not start_display:
-            start_display = session_copy.get('time') or "TBD"
+            start_display = session_copy.get("time") or "TBD"
         if not end_display:
-            end_display = session_copy.get('end_time_display') or "TBD"
+            end_display = session_copy.get("end_time_display") or "TBD"
 
-        session_copy['start_time'] = start_display
-        session_copy['end_time'] = end_display
+        session_copy["start_time"] = start_display
+        session_copy["end_time"] = end_display
 
-        attendees_data = session_copy.get('attendee_list', session_copy.get('attendees'))
-        room_type = find_room_type(session_copy.get('room_type_id'))
-        session_copy['room_type'] = room_type
+        attendees_data = session_copy.get(
+            "attendee_list", session_copy.get("attendees")
+        )
+        room_type = find_room_type(session_copy.get("room_type_id"))
+        session_copy["room_type"] = room_type
 
-        tag_ids = session_copy.get('tag_ids') or get_session_tag_ids(session_copy['id'])
-        session_copy['tag_ids'] = tag_ids
-        session_copy['tags'] = find_tags(tag_ids)
-        session_copy['resources'] = get_resources_for_session(session_copy['id'])
-        session_copy['reminders'] = get_reminders_for_session(session_copy['id'])
+        tag_ids = session_copy.get("tag_ids") or get_session_tag_ids(session_copy["id"])
+        session_copy["tag_ids"] = tag_ids
+        session_copy["tags"] = find_tags(tag_ids)
+        session_copy["resources"] = get_resources_for_session(session_copy["id"])
+        session_copy["reminders"] = get_reminders_for_session(session_copy["id"])
 
         return {
-            'session': session_copy,
-            'course': course,
-            'location': location,
-            'attendees': attendees_data
+            "session": session_copy,
+            "course": course,
+            "location": location,
+            "attendees": attendees_data,
         }
-    
+
     @app.route("/")
     def home():
+        inspector = inspect(db.engine)
+        table_names = inspector.get_table_names()
+
         return render_template("main_dashboard.html", 
                              my_sessions=my_sessions, 
                              join_sessions=join_sessions,
                              courses=test_course_offerings,
                              locations=test_locations,
                              room_types=test_room_types,
-                             tags=test_tags)
+                             tags=test_tags,
+                             tables=table_names)
     
     @app.route("/login")
     def login():
@@ -130,10 +144,10 @@ def register_routes(app):
     @app.route("/reset-password")
     def reset_password():
         return render_template("auth/reset_pass.html", title="Reset Password")
-    
-    @app.route("/create_session", methods=['GET', 'POST'])
+
+    @app.route("/create_session", methods=["GET", "POST"])
     def create_session():
-        if request.method == 'POST':
+        if request.method == "POST":
             # Get form data
             course_id = request.form.get('course_id', type=int)
             location_id = request.form.get('location_id', type=int)
@@ -160,11 +174,21 @@ def register_routes(app):
             selected_location = find_location(location_id)
             room_type = find_room_type(room_type_id)
 
-            course_title = selected_course['title'] if selected_course else course_input or "Study Session"
-            course_section = selected_course['section'] if selected_course and selected_course.get('section') else ""
-            professor_name = selected_course['professor_name'] if selected_course else None
-            course_year = selected_course['year'] if selected_course else None
-            course_term = selected_course['term'] if selected_course else None
+            course_title = (
+                selected_course["title"]
+                if selected_course
+                else course_input or "Study Session"
+            )
+            course_section = (
+                selected_course["section"]
+                if selected_course and selected_course.get("section")
+                else ""
+            )
+            professor_name = (
+                selected_course["professor_name"] if selected_course else None
+            )
+            course_year = selected_course["year"] if selected_course else None
+            course_term = selected_course["term"] if selected_course else None
 
             location_display = None
             if selected_location:
@@ -186,7 +210,9 @@ def register_routes(app):
             start_display = format_datetime_string(start_time) if start_time else None
             end_display = format_datetime_string(end_time) if end_time else None
 
-            existing_ids = [session['id'] for session in my_sessions] + [session['id'] for session in join_sessions]
+            existing_ids = [session["id"] for session in my_sessions] + [
+                session["id"] for session in join_sessions
+            ]
             new_session_id = max(existing_ids) + 1 if existing_ids else 1
 
             # Handle resource upload (placeholder upload to CDN)
@@ -217,8 +243,8 @@ def register_routes(app):
 
             new_session = {
                 "id": new_session_id,
-                "course_id": selected_course['id'] if selected_course else None,
-                "location_id": selected_location['id'] if selected_location else None,
+                "course_id": selected_course["id"] if selected_course else None,
+                "location_id": selected_location["id"] if selected_location else None,
                 "title": session_title,
                 "location": location_display,
                 "time": start_display or start_time or "TBD",
@@ -260,7 +286,7 @@ def register_routes(app):
                 })
 
             my_sessions.append(new_session)
-            
+
             # TODO: Add database logic here to save the session
             
             flash('Study session created successfully!', 'success')
@@ -336,131 +362,229 @@ def register_routes(app):
         # Find and remove the session from my_sessions
         session_to_remove = None
         for session in my_sessions:
-            if session['id'] == session_id:
+            if session["id"] == session_id:
                 session_to_remove = session
                 break
-        
+
         if session_to_remove:
             my_sessions.remove(session_to_remove)
-            return jsonify({'success': True, 'message': 'Successfully left the session'})
+            return jsonify(
+                {"success": True, "message": "Successfully left the session"}
+            )
         else:
-            return jsonify({'success': False, 'message': 'Session not found'}), 404
-    
+            return jsonify({"success": False, "message": "Session not found"}), 404
+
     # API endpoints for locations
-    @app.route("/api/locations", methods=['GET'])
+    @app.route("/api/locations", methods=["GET"])
     def get_locations():
-        query = request.args.get('q', '').lower()
-        
+        query = request.args.get("q", "").lower()
+
         # Filter locations based on query
         filtered_locations = [
-            location for location in test_locations
-            if query in location['address'].lower() or query in location['room_number'].lower()
+            location
+            for location in test_locations
+            if query in location["address"].lower()
+            or query in location["room_number"].lower()
         ]
-        
+
         return jsonify(filtered_locations)
-    
-    @app.route("/api/locations", methods=['POST'])
+
+    @app.route("/api/locations", methods=["POST"])
     def create_location():
         data = request.get_json()
-        
+
         # Validate required fields
-        if not data.get('address') or not data.get('room_number'):
-            return jsonify({'success': False, 'message': 'Address and room number are required'}), 400
-        
+        if not data.get("address") or not data.get("room_number"):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Address and room number are required",
+                    }
+                ),
+                400,
+            )
+
         # Validate field lengths
-        if len(data['address']) > 100:
-            return jsonify({'success': False, 'message': 'Address must be 100 characters or less'}), 400
-        if len(data['room_number']) > 20:
-            return jsonify({'success': False, 'message': 'Room number must be 20 characters or less'}), 400
-        
+        if len(data["address"]) > 100:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Address must be 100 characters or less",
+                    }
+                ),
+                400,
+            )
+        if len(data["room_number"]) > 20:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Room number must be 20 characters or less",
+                    }
+                ),
+                400,
+            )
+
         # Check if location already exists
         for location in test_locations:
-            if location['address'].lower() == data['address'].lower() and \
-               location['room_number'].lower() == data['room_number'].lower():
-                return jsonify({'success': False, 'message': 'This location already exists'}), 409
-        
+            if (
+                location["address"].lower() == data["address"].lower()
+                and location["room_number"].lower() == data["room_number"].lower()
+            ):
+                return (
+                    jsonify(
+                        {"success": False, "message": "This location already exists"}
+                    ),
+                    409,
+                )
+
         # Generate new ID
-        new_id = max([loc['id'] for loc in test_locations]) + 1 if test_locations else 1
-        
+        new_id = max([loc["id"] for loc in test_locations]) + 1 if test_locations else 1
+
         # Create new location
         new_location = {
-            'id': new_id,
-            'address': data['address'],
-            'room_number': data['room_number']
+            "id": new_id,
+            "address": data["address"],
+            "room_number": data["room_number"],
         }
-        
+
         test_locations.append(new_location)
-        
-        return jsonify({'success': True, 'location': new_location})
-    
+
+        return jsonify({"success": True, "location": new_location})
+
     # API endpoints for course offerings
-    @app.route("/api/courses", methods=['GET'])
+    @app.route("/api/courses", methods=["GET"])
     def get_courses():
-        query = request.args.get('q', '').lower()
-        
+        query = request.args.get("q", "").lower()
+
         # Filter courses based on query
         filtered_courses = [
-            course for course in test_course_offerings
-            if query in course['title'].lower() or 
-               query in course['section'].lower() or 
-               query in course['professor_name'].lower()
+            course
+            for course in test_course_offerings
+            if query in course["title"].lower()
+            or query in course["section"].lower()
+            or query in course["professor_name"].lower()
         ]
-        
+
         return jsonify(filtered_courses)
-    
-    @app.route("/api/courses", methods=['POST'])
+
+    @app.route("/api/courses", methods=["POST"])
     def create_course():
         data = request.get_json()
-        
+
         # Validate required fields
-        required_fields = ['title', 'section', 'year', 'term', 'professor_name']
+        required_fields = ["title", "section", "year", "term", "professor_name"]
         for field in required_fields:
             if field not in data or not data[field]:
-                return jsonify({'success': False, 'message': f'{field.replace("_", " ").title()} is required'}), 400
-        
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": f'{field.replace("_", " ").title()} is required',
+                        }
+                    ),
+                    400,
+                )
+
         # Validate field lengths
-        if len(data['title']) > 100:
-            return jsonify({'success': False, 'message': 'Title must be 100 characters or less'}), 400
-        if len(data['section']) > 20:
-            return jsonify({'success': False, 'message': 'Section must be 20 characters or less'}), 400
-        if len(data['professor_name']) > 50:
-            return jsonify({'success': False, 'message': 'Professor name must be 50 characters or less'}), 400
-        
+        if len(data["title"]) > 100:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Title must be 100 characters or less",
+                    }
+                ),
+                400,
+            )
+        if len(data["section"]) > 20:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Section must be 20 characters or less",
+                    }
+                ),
+                400,
+            )
+        if len(data["professor_name"]) > 50:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Professor name must be 50 characters or less",
+                    }
+                ),
+                400,
+            )
+
         # Validate year and term
         try:
-            year = int(data['year'])
-            term = int(data['term'])
+            year = int(data["year"])
+            term = int(data["term"])
             if year < 2020 or year > 2100:
-                return jsonify({'success': False, 'message': 'Year must be between 2020 and 2100'}), 400
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "Year must be between 2020 and 2100",
+                        }
+                    ),
+                    400,
+                )
             if term not in [1, 2, 3]:
-                return jsonify({'success': False, 'message': 'Term must be 1 (Fall), 2 (Spring), or 3 (Summer)'}), 400
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "Term must be 1 (Fall), 2 (Spring), or 3 (Summer)",
+                        }
+                    ),
+                    400,
+                )
         except ValueError:
-            return jsonify({'success': False, 'message': 'Invalid year or term'}), 400
-        
+            return jsonify({"success": False, "message": "Invalid year or term"}), 400
+
         # Check if course offering already exists
         for course in test_course_offerings:
-            if course['title'].lower() == data['title'].lower() and \
-               course['section'].lower() == data['section'].lower() and \
-               course['year'] == year and \
-               course['term'] == term:
-                return jsonify({'success': False, 'message': 'This course offering already exists'}), 409
-        
+            if (
+                course["title"].lower() == data["title"].lower()
+                and course["section"].lower() == data["section"].lower()
+                and course["year"] == year
+                and course["term"] == term
+            ):
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "This course offering already exists",
+                        }
+                    ),
+                    409,
+                )
+
         # Generate new ID
-        new_id = max([course['id'] for course in test_course_offerings]) + 1 if test_course_offerings else 1
-        
+        new_id = (
+            max([course["id"] for course in test_course_offerings]) + 1
+            if test_course_offerings
+            else 1
+        )
+
         # Create new course offering
         new_course = {
-            'id': new_id,
-            'title': data['title'],
-            'section': data['section'],
-            'year': year,
-            'term': term,
-            'professor_name': data['professor_name']
+            "id": new_id,
+            "title": data["title"],
+            "section": data["section"],
+            "year": year,
+            "term": term,
+            "professor_name": data["professor_name"],
         }
-        
+
         test_course_offerings.append(new_course)
-        
-        return jsonify({'success': True, 'course': new_course})
+
+        return jsonify({"success": True, "course": new_course})
 
     @app.route("/404")
     def show_not_found():
