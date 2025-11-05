@@ -41,43 +41,27 @@ def register_routes(app, db):
     def find_room_type(room_type_id):
         if not room_type_id:
             return None
-        return next(
-            (room for room in test_room_types if room["id"] == room_type_id), None
-        )
+        return next((room for room in test_room_types if room['id'] == room_type_id), None)
 
     def get_session_tag_ids(session_id):
         if not session_id:
             return []
-        return [
-            link["tag_id"]
-            for link in test_session_tags
-            if link["session_id"] == session_id
-        ]
+        return [link['tag_id'] for link in test_session_tags if link['session_id'] == session_id]
 
     def find_tags(tag_ids):
         if not tag_ids:
             return []
-        return [tag for tag in test_tags if tag["id"] in tag_ids]
+        return [tag for tag in test_tags if tag['id'] in tag_ids]
 
     def get_resources_for_session(session_id):
-        return [
-            resource
-            for resource in test_resources
-            if resource["session_id"] == session_id
-        ]
+        return [resource for resource in test_resources if resource['session_id'] == session_id]
 
     def get_reminders_for_session(session_id):
-        reminders = [
-            reminder
-            for reminder in test_reminders
-            if reminder["session_id"] == session_id
-        ]
+        reminders = [reminder for reminder in test_reminders if reminder['session_id'] == session_id]
         formatted = []
         for reminder in reminders:
             reminder_copy = dict(reminder)
-            reminder_copy["display_time"] = format_datetime_string(
-                reminder_copy.get("reminder_time")
-            )
+            reminder_copy['display_time'] = format_datetime_string(reminder_copy.get('reminder_time'))
             formatted.append(reminder_copy)
         return formatted
 
@@ -137,27 +121,14 @@ def register_routes(app, db):
 
     @app.route("/")
     def home():
-        try:
-            inspector = inspect(db.engine)
-            table_names = inspector.get_table_names()
-            metadata_tables = list(db.metadata.tables.keys())
-        except Exception as exc:
-            app.logger.warning("Unable to inspect database tables: %s", exc)
-            table_names = []
-            metadata_tables = []
-
-        return render_template(
-            "main_dashboard.html",
-            my_sessions=my_sessions,
-            join_sessions=join_sessions,
-            courses=test_course_offerings,
-            locations=test_locations,
-            room_types=test_room_types,
-            tags=test_tags,
-            tables=table_names,
-            metadata_tables=metadata_tables,
-        )
-
+        return render_template("main_dashboard.html", 
+                             my_sessions=my_sessions, 
+                             join_sessions=join_sessions,
+                             courses=test_course_offerings,
+                             locations=test_locations,
+                             room_types=test_room_types,
+                             tags=test_tags)
+    
     @app.route("/login")
     def login():
         return render_template("auth/login.html", title="Login")
@@ -174,19 +145,19 @@ def register_routes(app, db):
     def create_session():
         if request.method == "POST":
             # Get form data
-            course_id = request.form.get("course_id", type=int)
-            location_id = request.form.get("location_id", type=int)
-            course_input = request.form.get("course", "").strip()
-            location_input = request.form.get("location", "").strip()
-            max_attendees = request.form.get("max_attendees", type=int)
-            description = request.form.get("description")
-            start_time = request.form.get("start_time")
-            end_time = request.form.get("end_time")
-            chill_level = request.form.get("chill_level")
-            room_type_id = request.form.get("room_type_id", type=int)
-            reminder_time = request.form.get("reminder_time")
+            course_id = request.form.get('course_id', type=int)
+            location_id = request.form.get('location_id', type=int)
+            course_input = request.form.get('course', '').strip()
+            location_input = request.form.get('location', '').strip()
+            max_attendees = request.form.get('max_attendees', type=int)
+            description = request.form.get('description')
+            start_time = request.form.get('start_time')
+            end_time = request.form.get('end_time')
+            chill_level = request.form.get('chill_level')
+            room_type_id = request.form.get('room_type_id', type=int)
+            reminder_time = request.form.get('reminder_time')
             tag_ids = []
-            for raw_tag in request.form.getlist("tags"):
+            for raw_tag in request.form.getlist('tags'):
                 try:
                     tag_ids.append(int(raw_tag))
                 except (TypeError, ValueError):
@@ -241,21 +212,19 @@ def register_routes(app, db):
             new_session_id = max(existing_ids) + 1 if existing_ids else 1
 
             # Handle resource upload (placeholder upload to CDN)
-            resource_file = request.files.get("resource_file")
+            resource_file = request.files.get('resource_file')
             if resource_file and resource_file.filename:
                 filename = secure_filename(resource_file.filename)
-                if "." not in filename:
-                    flash("Resources must have a .txt or .pdf extension.", "error")
+                if '.' not in filename:
+                    flash('Resources must have a .txt or .pdf extension.', 'error')
                     return redirect(request.url)
-                extension = filename.rsplit(".", 1)[-1].lower()
-                if extension not in ("txt", "pdf"):
-                    flash("Resources must be a text or PDF file.", "error")
+                extension = filename.rsplit('.', 1)[-1].lower()
+                if extension not in ('txt', 'pdf'):
+                    flash('Resources must be a text or PDF file.', 'error')
                     return redirect(request.url)
 
-                existing_resource_ids = [resource["id"] for resource in test_resources]
-                new_resource_id = (
-                    max(existing_resource_ids) + 1 if existing_resource_ids else 1
-                )
+                existing_resource_ids = [resource['id'] for resource in test_resources]
+                new_resource_id = max(existing_resource_ids) + 1 if existing_resource_ids else 1
                 fake_url = f"https://cdn.example.com/uploads/{filename}"
 
                 new_resource = {
@@ -263,7 +232,7 @@ def register_routes(app, db):
                     "session_id": new_session_id,
                     "resource_name": filename,
                     "resource_url": fake_url,
-                    "updated_by": 0,
+                    "updated_by": 0
                 }
                 test_resources.append(new_resource)
                 resource_ids.append(new_resource_id)
@@ -287,45 +256,39 @@ def register_routes(app, db):
                 "year": course_year,
                 "term": course_term,
                 "section": course_section,
-                "room_type_id": room_type["id"] if room_type else None,
+                "room_type_id": room_type['id'] if room_type else None,
                 "tag_ids": tag_ids,
                 "resource_ids": resource_ids,
-                "reminder_ids": reminder_ids,
+                "reminder_ids": reminder_ids
             }
 
             if reminder_time:
-                existing_reminder_ids = [reminder["id"] for reminder in test_reminders]
-                new_reminder_id = (
-                    max(existing_reminder_ids) + 1 if existing_reminder_ids else 1
-                )
+                existing_reminder_ids = [reminder['id'] for reminder in test_reminders]
+                new_reminder_id = max(existing_reminder_ids) + 1 if existing_reminder_ids else 1
                 new_reminder = {
                     "id": new_reminder_id,
                     "session_id": new_session_id,
                     "user_id": 0,
                     "reminder_time": reminder_time,
-                    "reminder_sent": False,
+                    "reminder_sent": False
                 }
                 test_reminders.append(new_reminder)
                 reminder_ids.append(new_reminder_id)
 
             for tag_id in tag_ids:
-                test_session_tags.append(
-                    {"session_id": new_session_id, "tag_id": tag_id}
-                )
+                test_session_tags.append({
+                    "session_id": new_session_id,
+                    "tag_id": tag_id
+                })
 
             my_sessions.append(new_session)
 
             # TODO: Add database logic here to save the session
-
-            flash("Study session created successfully!", "success")
-            return redirect(url_for("view_session", session_id=new_session_id))
-
-        return render_template(
-            "create_session.html",
-            title="Create Session",
-            room_types=test_room_types,
-            tags=test_tags,
-        )
+            
+            flash('Study session created successfully!', 'success')
+            return redirect(url_for('view_session', session_id=new_session_id))
+            
+        return render_template("create_session.html", title="Create Session", room_types=test_room_types, tags=test_tags)
 
     @app.route("/sessions/<int:session_id>")
     def view_session(session_id):
@@ -337,41 +300,41 @@ def register_routes(app, db):
 
         return render_template(
             "session.html",
-            session=context["session"],
-            course=context["course"],
-            location=context["location"],
-            attendees=context["attendees"],
+            session=context['session'],
+            course=context['course'],
+            location=context['location'],
+            attendees=context['attendees'],
             tags=test_tags,
-            room_types=test_room_types,
+            room_types=test_room_types
         )
 
-    @app.route("/sessions/<int:session_id>/resources", methods=["POST"])
+    @app.route("/sessions/<int:session_id>/resources", methods=['POST'])
     def upload_session_resource(session_id):
         session_record = find_session(session_id)
         if not session_record:
             abort(404)
 
-        organizer_name = session_record.get("organizer", "")
+        organizer_name = session_record.get('organizer', '')
         if "You" not in organizer_name:
-            flash("Only the session organizer can upload resources for now.", "error")
-            return redirect(url_for("view_session", session_id=session_id))
+            flash('Only the session organizer can upload resources for now.', 'error')
+            return redirect(url_for('view_session', session_id=session_id))
 
-        resource_file = request.files.get("resource_file")
+        resource_file = request.files.get('resource_file')
         if not resource_file or not resource_file.filename:
-            flash("Please choose a text or PDF file to upload.", "error")
-            return redirect(url_for("view_session", session_id=session_id))
+            flash('Please choose a text or PDF file to upload.', 'error')
+            return redirect(url_for('view_session', session_id=session_id))
 
         filename = secure_filename(resource_file.filename)
-        if "." not in filename:
-            flash("Resources must have a .txt or .pdf extension.", "error")
-            return redirect(url_for("view_session", session_id=session_id))
+        if '.' not in filename:
+            flash('Resources must have a .txt or .pdf extension.', 'error')
+            return redirect(url_for('view_session', session_id=session_id))
 
-        extension = filename.rsplit(".", 1)[-1].lower()
-        if extension not in ("txt", "pdf"):
-            flash("Resources must be a text or PDF file.", "error")
-            return redirect(url_for("view_session", session_id=session_id))
+        extension = filename.rsplit('.', 1)[-1].lower()
+        if extension not in ('txt', 'pdf'):
+            flash('Resources must be a text or PDF file.', 'error')
+            return redirect(url_for('view_session', session_id=session_id))
 
-        existing_resource_ids = [resource["id"] for resource in test_resources]
+        existing_resource_ids = [resource['id'] for resource in test_resources]
         new_resource_id = max(existing_resource_ids) + 1 if existing_resource_ids else 1
         fake_url = f"https://cdn.example.com/uploads/{filename}"
 
@@ -380,20 +343,17 @@ def register_routes(app, db):
             "session_id": session_id,
             "resource_name": filename,
             "resource_url": fake_url,
-            "updated_by": 0,
+            "updated_by": 0
         }
         test_resources.append(new_resource)
 
-        resource_ids = session_record.setdefault("resource_ids", [])
+        resource_ids = session_record.setdefault('resource_ids', [])
         resource_ids.append(new_resource_id)
 
-        flash(
-            "Resource uploaded. The CDN link is a placeholder until storage is in place.",
-            "success",
-        )
-        return redirect(url_for("view_session", session_id=session_id))
-
-    @app.route("/leave_session/<int:session_id>", methods=["POST"])
+        flash('Resource uploaded. The CDN link is a placeholder until storage is in place.', 'success')
+        return redirect(url_for('view_session', session_id=session_id))
+    
+    @app.route("/leave_session/<int:session_id>", methods=['POST'])
     def leave_session(session_id):
         # Find and remove the session from my_sessions
         session_to_remove = None
