@@ -13,7 +13,18 @@
 
   <main class="dashboard-container">
     <div class="dashboard-content">
-      
+      {% if tables %}
+  <section class="tables-section">
+    <h2 class="section-title">Database Tables</h2>
+    <ul>
+      {% for table in tables %}
+        <li>{{ table }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+{% else %}
+  <p>No tables detected.</p>
+{% endif %}
       <!-- My Sessions Section -->
       <section class="sessions-section">
         <h2 class="section-title">My Sessions</h2>

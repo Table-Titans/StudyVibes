@@ -14,15 +14,11 @@ test_sessions = [
         "chill_level": "😎",
         "start_time": "2025-02-18T07:00:00",
         "end_time": "2025-02-18T09:00:00",
-        "attendee_list": [
-            "Alex Morgan (Organizer)",
-            "Taylor R.",
-            "Jamal K."
-        ],
+        "attendee_list": ["Alex Morgan (Organizer)", "Taylor R.", "Jamal K."],
         "room_type_id": 1,
         "tag_ids": [4],
         "resource_ids": [1],
-        "reminder_ids": [1]
+        "reminder_ids": [1],
     },
     {
         "id": 2,
@@ -39,14 +35,9 @@ test_sessions = [
         "chill_level": "🤓",
         "start_time": "2025-02-19T18:30:00",
         "end_time": "2025-02-19T20:00:00",
-        "attendee_list": [
-            "Priya Desai (Organizer)",
-            "Chris P.",
-            "Sung L.",
-            "Mei F."
-        ],
+        "attendee_list": ["Priya Desai (Organizer)", "Chris P.", "Sung L.", "Mei F."],
         "room_type_id": 2,
-        "tag_ids": [1, 3]
+        "tag_ids": [1, 3],
     },
     {
         "id": 13,
@@ -63,6 +54,6 @@ test_sessions = [
         "end_time": "2025-02-20T23:00:00",
         "room_type_id": 3,
         "reminder_ids": [2],
-        "tag_ids": [1]
-    }
+        "tag_ids": [1],
+    },
 ]

@@ -2,7 +2,7 @@ test_tags = [
     {"id": 1, "tag_name": "coding"},
     {"id": 2, "tag_name": "lab"},
     {"id": 3, "tag_name": "homework"},
-    {"id": 4, "tag_name": "exam prep"}
+    {"id": 4, "tag_name": "exam prep"},
 ]
 
 test_session_tags = [
@@ -19,5 +19,5 @@ test_session_tags = [
     {"session_id": 9, "tag_id": 1},
     {"session_id": 9, "tag_id": 2},
     {"session_id": 10, "tag_id": 2},
-    {"session_id": 13, "tag_id": 1}
+    {"session_id": 13, "tag_id": 1},
 ]
