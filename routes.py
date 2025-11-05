@@ -121,13 +121,17 @@ def register_routes(app, db):
 
     @app.route("/")
     def home():
+        inspector = inspect(db.engine)
+        table_names = inspector.get_table_names()
+
         return render_template("main_dashboard.html", 
                              my_sessions=my_sessions, 
                              join_sessions=join_sessions,
                              courses=test_course_offerings,
                              locations=test_locations,
                              room_types=test_room_types,
-                             tags=test_tags)
+                             tags=test_tags,
+                             tables=table_names)
     
     @app.route("/login")
     def login():

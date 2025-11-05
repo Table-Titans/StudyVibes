@@ -7,13 +7,13 @@ from config import Config
 
 # Flask extensions (shared across modules)
 db = SQLAlchemy()
-login_manager = LoginManager()
+# login_manager = LoginManager()
 
 
 def register_extensions(app: Flask) -> None:
     """Attach shared extensions to the Flask app."""
     db.init_app(app)
-    login_manager.init_app(app)
+    # login_manager.init_app(app)
 
 
 def create_app():
