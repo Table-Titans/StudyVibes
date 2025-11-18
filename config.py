@@ -1,4 +1,5 @@
 import os
+from urllib.parse import quote_plus
 import dotenv
 
 
@@ -8,13 +9,14 @@ class Config:
 
     host = os.getenv("DATABASE_HOST")
     user = os.getenv("DATABASE_USER")
-    pwd = os.getenv("DATABASE_PASSWORD")
-    port = os.getenv("DATABASE_PORT")
+    pwd_raw = os.getenv("DATABASE_PASSWORD")
+    port = os.getenv("DATABASE_PORT", "3306")
     name = os.getenv("DATABASE_NAME")
 
-    if host and user and pwd and name:
+    if host and user and pwd_raw and name:
+        pwd = quote_plus(pwd_raw)
         SQLALCHEMY_DATABASE_URI = (
-            f"mysql+pymysql://{user}:{pwd}@{host}:{str(3306)}/{name}"
+            f"mysql+pymysql://{user}:{pwd}@{host}:{port}/{name}"
         )
         SQLALCHEMY_TRACK_MODIFICATIONS = False
     else:
