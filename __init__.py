@@ -24,7 +24,7 @@ def create_app():
 
     Bootstrap5(app)
 
-    import models  # noqa: F401  # ensure models are registered with SQLAlchemy
+    import models
 
     from routes import register_routes
 
