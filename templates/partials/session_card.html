@@ -9,7 +9,9 @@
         {% endif %}
     {% endfor %}
 {% endif %}
-<div class="session_card {{ 'chill' if session.title.startswith('😎') else 'moderate' if session.title.startswith('🤓') else 'intense' if session.title.startswith('😤') else '' }}" 
+{% set chill_map = {1: "😎", 2: "🤓", 3: "😤", "1": "😎", "2": "🤓", "3": "😤"} %}
+{% set chill_display = chill_map.get(session.chill_level, session.chill_level) %}
+<div class="session_card {{ 'chill' if session.chill_level == 1 else 'moderate' if session.chill_level == 2 else 'intense' if session.chill_level == 3 else '' }}" 
      data-session-id="{{ session.id }}"
      data-course-id="{{ session.course_id if session.course_id else '' }}"
      data-location-id="{{ session.location_id if session.location_id else '' }}"
@@ -21,17 +23,24 @@
      data-tags="{{ tag_ns.items|join(',') }}">
     <a class="session-card-link" href="{{ url_for('view_session', session_id=session.id) }}">
         <div class="session_info">
-            <h1>{{ session.title }}</h1>
-            <p class="session-meta-line location">Location: <span>{{ session.location }}</span></p>
-            <p class="session-meta-line time">Time: <span>{{ session.time }}</span></p>
-            <p class="session-meta-line attendees">Attendees: <span>{{ session.attendees }}</span></p>
-            {% if tag_ns.items %}
-                <div class="session-tags">
-                    {% for tag_name in tag_ns.items %}
-                        <span class="tag-pill">{{ tag_name|title }}</span>
-                    {% endfor %}
+            {% if chill_display %}
+                <div class="session-chill-emoji" aria-label="Chill level">
+                    {{ chill_display }}
                 </div>
             {% endif %}
+            <div class="session-text">
+                <h1>{{ session.title }}</h1>
+                <p class="session-meta-line location">Location: <span>{{ session.location }}</span></p>
+                <p class="session-meta-line time">Time: <span>{{ session.time }}</span></p>
+                <p class="session-meta-line attendees">Attendees: <span>{{ session.attendees }}</span></p>
+                {% if tag_ns.items %}
+                    <div class="session-tags">
+                        {% for tag_name in tag_ns.items %}
+                            <span class="tag-pill">{{ tag_name|title }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
         </div>
     </a>
     <div class="session-card-actions">

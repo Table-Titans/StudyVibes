@@ -1,149 +1,346 @@
 from datetime import datetime
 
-from flask import render_template, request, redirect, url_for, flash, jsonify, abort
+from flask import render_template, request, redirect, url_for, flash, jsonify, abort, current_app
+from flask_login import (
+    current_user,
+    login_required,
+    login_user,
+    logout_user,
+)
+from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
-from tests.my_session_data import test_sessions as my_sessions
-from tests.join_session_data import test_sessions as join_sessions
-from tests.location_data import test_locations
-from tests.course_offering_data import test_course_offerings
-from tests.room_type_data import test_room_types
-from tests.tag_data import test_tags, test_session_tags
-from tests.resource_data import test_resources
-from tests.reminder_data import test_reminders
+from models import User
+import sql_queries as queries
 
-def register_routes(app):
+
+def register_routes(app, db):
 
     def find_course(course_id):
         if not course_id:
             return None
-        return next((course for course in test_course_offerings if course['id'] == course_id), None)
+        row = db.session.execute(
+            queries.find_course_query, {"course_id": course_id}
+        ).first()
+        return dict(row._mapping) if row else None
 
     def find_location(location_id):
         if not location_id:
             return None
-        return next((location for location in test_locations if location['id'] == location_id), None)
+        row = db.session.execute(
+            queries.find_location_query, {"location_id": location_id}
+        ).first()
+        return dict(row._mapping) if row else None
 
     def find_session(session_id):
-        for collection in (my_sessions, join_sessions):
-            for session in collection:
-                if session['id'] == session_id:
-                    return session
-        return None
+        if not session_id:
+            return None
+        row = db.session.execute(
+            queries.find_session_query, {"session_id": session_id}
+        ).first()
+        if not row:
+            return None
+        session_dict = {
+            "id": row.session_id,
+            "session_id": row.session_id,
+            "course_id": row.course_offering_id,
+            "location_id": row.location_id,
+            "organizer_id": row.organizer_id,
+            "max_attendees": row.max_attendees,
+            "description": row.description,
+            "start_time": row.start_time.isoformat() if row.start_time else None,
+            "end_time": row.end_time.isoformat() if row.end_time else None,
+            "chill_level": row.chill_level,
+            "room_type_id": row.room_type_id,
+            "title": row.course_title or row.description or "Study Session",
+            "location": f"{row.location_address} - Room {row.location_room}" if row.location_address else "TBD",
+            "time": row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else "TBD",
+            "attendees": "TBD",
+        }
+        return session_dict
 
     def find_room_type(room_type_id):
         if not room_type_id:
             return None
-        return next((room for room in test_room_types if room['id'] == room_type_id), None)
+        row = db.session.execute(
+            queries.find_room_type_query, {"room_type_id": room_type_id}
+        ).first()
+        return dict(row._mapping) if row else None
 
     def get_session_tag_ids(session_id):
         if not session_id:
             return []
-        return [link['tag_id'] for link in test_session_tags if link['session_id'] == session_id]
+        rows = db.session.execute(
+            queries.get_session_tag_ids_query, {"session_id": session_id}
+        ).fetchall()
+        return [row.tag_id for row in rows]
 
     def find_tags(tag_ids):
         if not tag_ids:
             return []
-        return [tag for tag in test_tags if tag['id'] in tag_ids]
+        tags = []
+        for tag_id in tag_ids:
+            row = db.session.execute(
+                queries.find_tag_by_id_query,
+                {"tag_id": tag_id},
+            ).first()
+            if row:
+                tags.append(dict(row._mapping))
+        return tags
 
     def get_resources_for_session(session_id):
-        return [resource for resource in test_resources if resource['session_id'] == session_id]
+        rows = db.session.execute(
+            queries.get_resources_for_session_query,
+            {"session_id": session_id},
+        ).fetchall()
+        return [dict(row._mapping) for row in rows]
 
     def get_reminders_for_session(session_id):
-        reminders = [reminder for reminder in test_reminders if reminder['session_id'] == session_id]
-        formatted = []
-        for reminder in reminders:
-            reminder_copy = dict(reminder)
+        rows = db.session.execute(
+            queries.get_reminders_for_session_query,
+            {"session_id": session_id},
+        ).fetchall()
+        reminders = []
+        for row in rows:
+            reminder_copy = dict(row._mapping)
             reminder_copy['display_time'] = format_datetime_string(reminder_copy.get('reminder_time'))
-            formatted.append(reminder_copy)
-        return formatted
+            reminders.append(reminder_copy)
+        return reminders
 
     def format_datetime_string(value):
         if not value:
             return None
-        try:
-            dt = datetime.fromisoformat(value)
-            # Remove leading zero from day component in a cross-platform safe way
-            formatted = dt.strftime("%B %d, %Y %I:%M %p")
-            return formatted.replace(" 0", " ").lstrip("0")
-        except ValueError:
-            return value
+        if isinstance(value, datetime):
+            dt = value
+        else:
+            try:
+                dt = datetime.fromisoformat(value)
+            except ValueError:
+                return value
+        formatted = dt.strftime("%B %d, %Y %I:%M %p")
+        return formatted.replace(" 0", " ").lstrip("0")
+
+    def fetch_all_courses():
+        rows = db.session.execute(queries.fetch_all_courses_query).fetchall()
+        return [dict(row._mapping) for row in rows]
+
+    def fetch_all_locations():
+        rows = db.session.execute(queries.fetch_all_locations_query).fetchall()
+        return [dict(row._mapping) for row in rows]
+
+    def fetch_all_room_types():
+        rows = db.session.execute(queries.fetch_all_room_types_query).fetchall()
+        return [dict(row._mapping) for row in rows]
+
+    def fetch_all_tags():
+        rows = db.session.execute(queries.fetch_all_tags_query).fetchall()
+        return [dict(row._mapping) for row in rows]
 
     def build_session_context(session_record):
         if not session_record:
             return None
 
         session_copy = dict(session_record)
-        course = find_course(session_copy.get('course_id'))
-        location = find_location(session_copy.get('location_id'))
+        course = find_course(session_copy.get("course_id"))
+        location = find_location(session_copy.get("location_id"))
 
         # Prefer explicit start/end times; fall back to generic time if needed
-        start_display = session_copy.get('start_time')
-        end_display = session_copy.get('end_time')
+        start_display = session_copy.get("start_time")
+        end_display = session_copy.get("end_time")
         if start_display and "T" in start_display:
             start_display = format_datetime_string(start_display)
         if end_display and "T" in end_display:
             end_display = format_datetime_string(end_display)
 
         if not start_display:
-            start_display = session_copy.get('time') or "TBD"
+            start_display = session_copy.get("time") or "TBD"
         if not end_display:
-            end_display = session_copy.get('end_time_display') or "TBD"
+            end_display = session_copy.get("end_time_display") or "TBD"
 
-        session_copy['start_time'] = start_display
-        session_copy['end_time'] = end_display
+        session_copy["start_time"] = start_display
+        session_copy["end_time"] = end_display
 
-        attendees_data = session_copy.get('attendee_list', session_copy.get('attendees'))
-        room_type = find_room_type(session_copy.get('room_type_id'))
-        session_copy['room_type'] = room_type
+        attendees_data = session_copy.get(
+            "attendee_list", session_copy.get("attendees")
+        )
+        room_type = find_room_type(session_copy.get("room_type_id"))
+        session_copy["room_type"] = room_type
 
-        tag_ids = session_copy.get('tag_ids') or get_session_tag_ids(session_copy['id'])
-        session_copy['tag_ids'] = tag_ids
-        session_copy['tags'] = find_tags(tag_ids)
-        session_copy['resources'] = get_resources_for_session(session_copy['id'])
-        session_copy['reminders'] = get_reminders_for_session(session_copy['id'])
+        tag_ids = session_copy.get("tag_ids") or get_session_tag_ids(session_copy["id"])
+        session_copy["tag_ids"] = tag_ids
+        session_copy["tags"] = find_tags(tag_ids)
+        session_copy["resources"] = get_resources_for_session(session_copy["id"])
+        session_copy["reminders"] = get_reminders_for_session(session_copy["id"])
 
         return {
-            'session': session_copy,
-            'course': course,
-            'location': location,
-            'attendees': attendees_data
+            "session": session_copy,
+            "course": course,
+            "location": location,
+            "attendees": attendees_data,
         }
-    
+
     @app.route("/")
+    @login_required
     def home():
+        result = db.session.execute(queries.list_all_sessions_query)
+        rows = result.fetchall()
+        all_sessions = []
+        for row in rows:
+            session_dict = {
+                'id': row.session_id,
+                'session_id': row.session_id,
+                'course_id': row.course_offering_id,
+                'location_id': row.location_id,
+                'organizer_id': row.organizer_id,
+                'max_attendees': row.max_attendees,
+                'description': row.description,
+                'start_time': row.start_time.isoformat() if row.start_time else None,
+                'end_time': row.end_time.isoformat() if row.end_time else None,
+                'chill_level': row.chill_level,
+                'room_type_id': row.room_type_id,
+                'title': row.course_title or row.description or 'Study Session',
+                'location': f"{row.location_address} - Room {row.location_room}" if row.location_address else 'TBD',
+                'time': row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else 'TBD',
+                'attendees': 'TBD',
+            }
+            all_sessions.append(session_dict)
+        
+        rows = db.session.execute(
+            queries.user_sessions_query,
+            {"id": current_user.user_id},
+        ).fetchall()
+        my_sessions = []
+        for row in rows:
+            session_dict = {
+                'id': row.session_id,
+                'session_id': row.session_id,
+                'course_id': row.course_offering_id,
+                'location_id': row.location_id,
+                'organizer_id': row.organizer_id,
+                'max_attendees': row.max_attendees,
+                'description': row.description,
+                'start_time': row.start_time.isoformat() if row.start_time else None,
+                'end_time': row.end_time.isoformat() if row.end_time else None,
+                'chill_level': row.chill_level,
+                'room_type_id': row.room_type_id,
+                'title': row.course_title or row.description or 'Study Session',
+                'location': f"{row.location_address} - Room {row.location_room}" if row.location_address else 'TBD',
+                'time': row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else 'TBD',
+                'attendees': 'TBD',
+            }
+            my_sessions.append(session_dict)
+
         return render_template("main_dashboard.html", 
                              my_sessions=my_sessions, 
-                             join_sessions=join_sessions,
-                             courses=test_course_offerings,
-                             locations=test_locations,
-                             room_types=test_room_types,
-                             tags=test_tags)
+                             join_sessions=all_sessions,
+                             courses=fetch_all_courses(),
+                             locations=fetch_all_locations(),
+                             room_types=fetch_all_room_types(),
+                             tags=fetch_all_tags())
     
-    @app.route("/login")
+    @app.route("/login", methods=["GET", "POST"])
     def login():
+        if request.method == "POST":
+            email = (request.form.get("email") or "").strip().lower()
+            password = request.form.get("password") or ""
+
+            if not email or not password:
+                flash("Email and password are required.", "error")
+                return redirect(url_for("login"))
+
+            result = db.session.execute(
+                queries.login_lookup_query, {"email": email}
+            ).first()
+            if not result:
+                flash("Invalid email or password.", "error")
+                return redirect(url_for("login"))
+
+            user = User.from_record(result)
+            if not user.password_hash or not check_password_hash(user.password_hash, password):
+                flash("Invalid email or password.", "error")
+                return redirect(url_for("login"))
+
+            login_user(user)
+            return redirect(url_for("home"))
+
         return render_template("auth/login.html", title="Login")
 
-    @app.route("/register")
+    @app.route("/register", methods=["GET", "POST"])
     def register():
+        if request.method == "POST":
+            first_name = (request.form.get("first_name") or "").strip()
+            last_name = (request.form.get("last_name") or "").strip()
+            email = (request.form.get("email") or "").strip().lower()
+            phone = (request.form.get("phone") or "").strip()
+            password = request.form.get("password") or ""
+            confirm_password = request.form.get("confirm_password") or ""
+
+            if not all([first_name, last_name, email, phone, password]):
+                flash("All fields are required.", "error")
+                return redirect(url_for("register"))
+
+            if password != confirm_password:
+                flash("Passwords do not match.", "error")
+                return redirect(url_for("register"))
+
+            duplicate = db.session.execute(
+                queries.register_email_duplicate_query, {"email": email}
+            ).first()
+            if duplicate:
+                flash("An account with that email already exists.", "error")
+                return redirect(url_for("register"))
+
+            password_hash = generate_password_hash(password)
+            try:
+                result = db.session.execute(
+                    queries.register_insert_user_query,
+                    {
+                        "email": email,
+                        "password_hash": password_hash,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "phone": phone,
+                    },
+                )
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                current_app.logger.exception("Registration insert failed")
+                flash("Unable to create your account. Please try again.", "error")
+                return redirect(url_for("register"))
+
+            new_user_id = result.lastrowid
+            if not new_user_id:
+                new_user_id = db.session.execute(
+                    queries.find_user_by_email_desc_query,
+                    {"email": email},
+                ).scalar()
+
+            created_row = db.session.execute(
+                queries.fetch_user_by_id_query, {"user_id": new_user_id}
+            ).first()
+            user = User.from_record(created_row)
+            login_user(user)
+            return redirect(url_for("home"))
+
         return render_template("auth/register.html", title="Register")
 
-    @app.route("/reset-password")
-    def reset_password():
-        return render_template("auth/reset_pass.html", title="Reset Password")
-    
-    @app.route("/create_session", methods=['GET', 'POST'])
+    @app.route("/logout")
+    @login_required
+    def logout():
+        logout_user()
+        return redirect(url_for("login"))
+
+    @app.route("/create_session", methods=["GET", "POST"])
+    @login_required
     def create_session():
-        if request.method == 'POST':
-            # Get form data
+        if request.method == "POST":
             course_id = request.form.get('course_id', type=int)
             location_id = request.form.get('location_id', type=int)
-            course_input = request.form.get('course', '').strip()
-            location_input = request.form.get('location', '').strip()
             max_attendees = request.form.get('max_attendees', type=int)
             description = request.form.get('description')
             start_time = request.form.get('start_time')
             end_time = request.form.get('end_time')
-            chill_level = request.form.get('chill_level')
+            chill_level = request.form.get('chill_level', type=int)
             room_type_id = request.form.get('room_type_id', type=int)
             reminder_time = request.form.get('reminder_time')
             tag_ids = []
@@ -152,45 +349,16 @@ def register_routes(app):
                     tag_ids.append(int(raw_tag))
                 except (TypeError, ValueError):
                     continue
-            resource_ids = []
-            reminder_ids = []
-            organizer = "You"
-
-            selected_course = find_course(course_id)
-            selected_location = find_location(location_id)
-            room_type = find_room_type(room_type_id)
-
-            course_title = selected_course['title'] if selected_course else course_input or "Study Session"
-            course_section = selected_course['section'] if selected_course and selected_course.get('section') else ""
-            professor_name = selected_course['professor_name'] if selected_course else None
-            course_year = selected_course['year'] if selected_course else None
-            course_term = selected_course['term'] if selected_course else None
-
-            location_display = None
-            if selected_location:
-                location_display = f"{selected_location['address']} - Room {selected_location['room_number']}"
-            elif location_input:
-                location_display = location_input
-            else:
-                location_display = "TBD"
-
-            def decorate_title(base_title, section):
-                if section:
-                    return f"{base_title} - Section {section}"
-                return base_title
-
-            emoji_prefix = chill_level if chill_level in ("😎", "🤓", "😤") else ""
-            base_title = decorate_title(course_title, course_section)
-            session_title = f"{emoji_prefix} {base_title}".strip()
-
-            start_display = format_datetime_string(start_time) if start_time else None
-            end_display = format_datetime_string(end_time) if end_time else None
-
-            existing_ids = [session['id'] for session in my_sessions] + [session['id'] for session in join_sessions]
-            new_session_id = max(existing_ids) + 1 if existing_ids else 1
-
-            # Handle resource upload (placeholder upload to CDN)
             resource_file = request.files.get('resource_file')
+
+            if not course_id or not location_id:
+                flash('Please pick a course and location from the list.', 'error')
+                return redirect(request.url)
+
+            if not max_attendees or not description or not start_time or not end_time or not chill_level or not room_type_id:
+                flash('All required fields must be filled out.', 'error')
+                return redirect(request.url)
+
             if resource_file and resource_file.filename:
                 filename = secure_filename(resource_file.filename)
                 if '.' not in filename:
@@ -200,81 +368,118 @@ def register_routes(app):
                 if extension not in ('txt', 'pdf'):
                     flash('Resources must be a text or PDF file.', 'error')
                     return redirect(request.url)
+                resource_name = filename
+                resource_url = f"https://cdn.example.com/uploads/{filename}"
+            else:
+                resource_name = None
+                resource_url = None
 
-                existing_resource_ids = [resource['id'] for resource in test_resources]
-                new_resource_id = max(existing_resource_ids) + 1 if existing_resource_ids else 1
-                fake_url = f"https://cdn.example.com/uploads/{filename}"
+            selected_course = find_course(course_id)
+            selected_location = find_location(location_id)
+            room_type = find_room_type(room_type_id)
 
-                new_resource = {
-                    "id": new_resource_id,
-                    "session_id": new_session_id,
-                    "resource_name": filename,
-                    "resource_url": fake_url,
-                    "updated_by": 0
-                }
-                test_resources.append(new_resource)
-                resource_ids.append(new_resource_id)
+            if not selected_course or not selected_location or not room_type:
+                flash('Could not find the selected course, location, or room type.', 'error')
+                return redirect(request.url)
 
-            new_session = {
-                "id": new_session_id,
-                "course_id": selected_course['id'] if selected_course else None,
-                "location_id": selected_location['id'] if selected_location else None,
-                "title": session_title,
-                "location": location_display,
-                "time": start_display or start_time or "TBD",
-                "attendees": 1,
-                "max_attendees": max_attendees,
-                "description": description,
-                "attendee_list": ["You (Organizer)"],
-                "start_time": start_time,
-                "end_time": end_time,
-                "organizer": organizer,
-                "chill_level": emoji_prefix,
-                "professor_name": professor_name,
-                "year": course_year,
-                "term": course_term,
-                "section": course_section,
-                "room_type_id": room_type['id'] if room_type else None,
-                "tag_ids": tag_ids,
-                "resource_ids": resource_ids,
-                "reminder_ids": reminder_ids
-            }
+            start_value = start_time.replace("T", " ")
+            end_value = end_time.replace("T", " ")
+
+            session_result = db.session.execute(
+                queries.insert_study_session_query,
+                {
+                    "course_offering_id": course_id,
+                    "location_id": location_id,
+                    "organizer_id": current_user.user_id,
+                    "max_attendees": max_attendees,
+                    "description": description,
+                    "start_time": start_value,
+                    "end_time": end_value,
+                    "chill_level": chill_level,
+                    "room_type_id": room_type_id,
+                },
+            )
+            new_session_id = session_result.lastrowid
+            if not new_session_id:
+                new_session_id = db.session.execute(
+                    queries.latest_session_id_query
+                ).scalar()
+
+            db.session.execute(
+                queries.insert_attendance_query,
+                {"user_id": current_user.user_id, "session_id": new_session_id},
+            )
+
+            if resource_name and resource_url:
+                db.session.execute(
+                    queries.insert_resource_query,
+                    {
+                        "session_id": new_session_id,
+                        "uploaded_by": current_user.user_id,
+                        "resource_name": resource_name,
+                        "resource_url": resource_url,
+                    },
+                )
 
             if reminder_time:
-                existing_reminder_ids = [reminder['id'] for reminder in test_reminders]
-                new_reminder_id = max(existing_reminder_ids) + 1 if existing_reminder_ids else 1
-                new_reminder = {
-                    "id": new_reminder_id,
-                    "session_id": new_session_id,
-                    "user_id": 0,
-                    "reminder_time": reminder_time,
-                    "reminder_sent": False
-                }
-                test_reminders.append(new_reminder)
-                reminder_ids.append(new_reminder_id)
+                db.session.execute(
+                    queries.insert_reminder_query,
+                    {
+                        "session_id": new_session_id,
+                        "user_id": current_user.user_id,
+                        "reminder_time": reminder_time.replace("T", " "),
+                    },
+                )
 
             for tag_id in tag_ids:
-                test_session_tags.append({
-                    "session_id": new_session_id,
-                    "tag_id": tag_id
-                })
+                db.session.execute(
+                    queries.insert_session_tag_query,
+                    {"session_id": new_session_id, "tag_id": tag_id},
+                )
 
-            my_sessions.append(new_session)
+            db.session.commit()
             
-            # TODO: Add database logic here to save the session
-            
-            flash('Study session created successfully!', 'success')
             return redirect(url_for('view_session', session_id=new_session_id))
             
-        return render_template("create_session.html", title="Create Session", room_types=test_room_types, tags=test_tags)
+        return render_template("create_session.html", title="Create Session", room_types=fetch_all_room_types(), tags=fetch_all_tags())
 
     @app.route("/sessions/<int:session_id>")
+    @login_required
     def view_session(session_id):
-        session_record = find_session(session_id)
-        if not session_record:
-            abort(404)
+        result = db.session.execute(
+            queries.view_session_query, {"session_id": session_id}
+        )
+        row = result.fetchone()
 
-        context = build_session_context(session_record)
+        if not row:
+            abort(404)
+        
+        # Build session dict with course and location
+        session_dict = {
+            'id': row.session_id,
+            'session_id': row.session_id,
+            'course_id': row.course_offering_id,
+            'location_id': row.location_id,
+            'organizer_id': row.organizer_id,
+            'max_attendees': row.max_attendees,
+            'description': row.description,
+            'start_time': row.start_time.isoformat() if row.start_time else None,
+            'end_time': row.end_time.isoformat() if row.end_time else None,
+            'chill_level': row.chill_level,
+            'room_type_id': row.room_type_id,
+            'title': row.course_title or row.description or 'Study Session',
+            'location': f"{row.location_address} - Room {row.location_room}" if row.location_address else 'TBD',
+            'time': row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else 'TBD',
+            'attendees': 'TBD',
+            'attendee_list': ['TBD'],
+            'organizer': 'TBD',
+            'tag_ids': [],
+            'resource_ids': [],
+            'reminder_ids': []
+        }
+        
+        # Build context for course and location details
+        context = build_session_context(session_dict)
 
         return render_template(
             "session.html",
@@ -282,18 +487,17 @@ def register_routes(app):
             course=context['course'],
             location=context['location'],
             attendees=context['attendees'],
-            tags=test_tags,
-            room_types=test_room_types
         )
 
     @app.route("/sessions/<int:session_id>/resources", methods=['POST'])
+    @login_required
     def upload_session_resource(session_id):
         session_record = find_session(session_id)
         if not session_record:
             abort(404)
 
-        organizer_name = session_record.get('organizer', '')
-        if "You" not in organizer_name:
+        organizer_id = session_record.get('organizer_id')
+        if organizer_id != current_user.user_id:
             flash('Only the session organizer can upload resources for now.', 'error')
             return redirect(url_for('view_session', session_id=session_id))
 
@@ -312,155 +516,321 @@ def register_routes(app):
             flash('Resources must be a text or PDF file.', 'error')
             return redirect(url_for('view_session', session_id=session_id))
 
-        existing_resource_ids = [resource['id'] for resource in test_resources]
-        new_resource_id = max(existing_resource_ids) + 1 if existing_resource_ids else 1
         fake_url = f"https://cdn.example.com/uploads/{filename}"
 
-        new_resource = {
-            "id": new_resource_id,
-            "session_id": session_id,
-            "resource_name": filename,
-            "resource_url": fake_url,
-            "updated_by": 0
-        }
-        test_resources.append(new_resource)
-
-        resource_ids = session_record.setdefault('resource_ids', [])
-        resource_ids.append(new_resource_id)
+        db.session.execute(
+            queries.insert_resource_query,
+            {
+                "session_id": session_id,
+                "uploaded_by": current_user.user_id,
+                "resource_name": filename,
+                "resource_url": fake_url,
+            },
+        )
+        db.session.commit()
 
         flash('Resource uploaded. The CDN link is a placeholder until storage is in place.', 'success')
         return redirect(url_for('view_session', session_id=session_id))
+
+    @app.route("/join_session/<int:session_id>", methods=['POST'])
+    @login_required
+    def join_session(session_id):
+        wants_json = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+        session_row = db.session.execute(
+            queries.session_exists_query, {"session_id": session_id}
+        ).first()
+        if not session_row:
+            message = "That session does not exist."
+            if wants_json:
+                return jsonify({"success": False, "message": message}), 404
+            flash(message, "error")
+            return redirect(url_for("home"))
+
+        already_joined = db.session.execute(
+            queries.attendance_exists_query,
+            {"session_id": session_id, "user_id": current_user.user_id},
+        ).first()
+        if already_joined:
+            message = "You already joined this session."
+            if wants_json:
+                return jsonify({"success": False, "message": message}), 400
+            flash(message, "info")
+            return redirect(url_for("home"))
+
+        try:
+            db.session.execute(
+                queries.insert_attendance_query,
+                {"session_id": session_id, "user_id": current_user.user_id},
+            )
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Failed to join session %s", session_id)
+            message = "Could not join that session. Please try again."
+            if wants_json:
+                return jsonify({"success": False, "message": message}), 500
+            flash(message, "error")
+            return redirect(url_for("home"))
+
+        if wants_json:
+            return jsonify({"success": True, "session_id": session_id})
+
+        flash("Thanks for joining the session!", "success")
+        return redirect(url_for("home"))
     
     @app.route("/leave_session/<int:session_id>", methods=['POST'])
+    @login_required
     def leave_session(session_id):
-        # Find and remove the session from my_sessions
-        session_to_remove = None
-        for session in my_sessions:
-            if session['id'] == session_id:
-                session_to_remove = session
-                break
-        
-        if session_to_remove:
-            my_sessions.remove(session_to_remove)
-            return jsonify({'success': True, 'message': 'Successfully left the session'})
-        else:
-            return jsonify({'success': False, 'message': 'Session not found'}), 404
-    
+        result = db.session.execute(
+            queries.delete_attendance_query,
+            {"session_id": session_id, "user_id": current_user.user_id},
+        )
+        db.session.commit()
+
+        if result.rowcount:
+            return jsonify(
+                {"success": True, "message": "Successfully left the session"}
+            )
+        return jsonify({"success": False, "message": "Session not found"}), 404
+
     # API endpoints for locations
-    @app.route("/api/locations", methods=['GET'])
+    @app.route("/api/locations", methods=["GET"])
+    @login_required
     def get_locations():
-        query = request.args.get('q', '').lower()
-        
-        # Filter locations based on query
-        filtered_locations = [
-            location for location in test_locations
-            if query in location['address'].lower() or query in location['room_number'].lower()
-        ]
-        
-        return jsonify(filtered_locations)
-    
-    @app.route("/api/locations", methods=['POST'])
+        query_value = request.args.get("q", "").lower()
+        if query_value:
+            locations = db.session.execute(
+                queries.search_locations_query,
+                {"pattern": f"%{query_value}%"},
+            ).fetchall()
+        else:
+            locations = db.session.execute(
+                queries.list_locations_query
+            ).fetchall()
+
+        return jsonify([dict(row._mapping) for row in locations])
+
+    @app.route("/api/locations", methods=["POST"])
+    @login_required
     def create_location():
         data = request.get_json()
-        
+
         # Validate required fields
-        if not data.get('address') or not data.get('room_number'):
-            return jsonify({'success': False, 'message': 'Address and room number are required'}), 400
-        
+        if not data.get("address") or not data.get("room_number"):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Address and room number are required",
+                    }
+                ),
+                400,
+            )
+
         # Validate field lengths
-        if len(data['address']) > 100:
-            return jsonify({'success': False, 'message': 'Address must be 100 characters or less'}), 400
-        if len(data['room_number']) > 20:
-            return jsonify({'success': False, 'message': 'Room number must be 20 characters or less'}), 400
-        
-        # Check if location already exists
-        for location in test_locations:
-            if location['address'].lower() == data['address'].lower() and \
-               location['room_number'].lower() == data['room_number'].lower():
-                return jsonify({'success': False, 'message': 'This location already exists'}), 409
-        
-        # Generate new ID
-        new_id = max([loc['id'] for loc in test_locations]) + 1 if test_locations else 1
-        
-        # Create new location
+        if len(data["address"]) > 100:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Address must be 100 characters or less",
+                    }
+                ),
+                400,
+            )
+        if len(data["room_number"]) > 20:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Room number must be 20 characters or less",
+                    }
+                ),
+                400,
+            )
+
+        duplicate = db.session.execute(
+            queries.location_duplicate_query,
+            {
+                "address": data["address"].lower(),
+                "room": data["room_number"].lower(),
+            },
+        ).first()
+        if duplicate:
+            return (
+                jsonify(
+                    {"success": False, "message": "This location already exists"}
+                ),
+                409,
+            )
+
+        result = db.session.execute(
+            queries.insert_location_query,
+            {
+                "address": data["address"],
+                "room_number": data["room_number"],
+                "created_by_user": current_user.user_id,
+            },
+        )
+        db.session.commit()
+        new_id = result.lastrowid
+        if not new_id:
+            new_id = db.session.execute(
+                queries.latest_location_id_query
+            ).scalar()
+
         new_location = {
-            'id': new_id,
-            'address': data['address'],
-            'room_number': data['room_number']
+            "id": new_id,
+            "address": data["address"],
+            "room_number": data["room_number"],
         }
-        
-        test_locations.append(new_location)
-        
-        return jsonify({'success': True, 'location': new_location})
-    
+
+        return jsonify({"success": True, "location": new_location})
+
     # API endpoints for course offerings
-    @app.route("/api/courses", methods=['GET'])
+    @app.route("/api/courses", methods=["GET"])
+    @login_required
     def get_courses():
-        query = request.args.get('q', '').lower()
-        
-        # Filter courses based on query
-        filtered_courses = [
-            course for course in test_course_offerings
-            if query in course['title'].lower() or 
-               query in course['section'].lower() or 
-               query in course['professor_name'].lower()
-        ]
-        
-        return jsonify(filtered_courses)
-    
-    @app.route("/api/courses", methods=['POST'])
+        query_value = request.args.get("q", "").lower()
+        if query_value:
+            courses = db.session.execute(
+                queries.search_courses_query,
+                {"pattern": f"%{query_value}%"},
+            ).fetchall()
+        else:
+            courses = db.session.execute(
+                queries.list_courses_query
+            ).fetchall()
+
+        return jsonify([dict(row._mapping) for row in courses])
+
+    @app.route("/api/courses", methods=["POST"])
+    @login_required
     def create_course():
         data = request.get_json()
-        
+
         # Validate required fields
-        required_fields = ['title', 'section', 'year', 'term', 'professor_name']
+        required_fields = ["title", "section", "year", "term", "professor_name"]
         for field in required_fields:
             if field not in data or not data[field]:
-                return jsonify({'success': False, 'message': f'{field.replace("_", " ").title()} is required'}), 400
-        
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": f'{field.replace("_", " ").title()} is required',
+                        }
+                    ),
+                    400,
+                )
+
         # Validate field lengths
-        if len(data['title']) > 100:
-            return jsonify({'success': False, 'message': 'Title must be 100 characters or less'}), 400
-        if len(data['section']) > 20:
-            return jsonify({'success': False, 'message': 'Section must be 20 characters or less'}), 400
-        if len(data['professor_name']) > 50:
-            return jsonify({'success': False, 'message': 'Professor name must be 50 characters or less'}), 400
-        
+        if len(data["title"]) > 100:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Title must be 100 characters or less",
+                    }
+                ),
+                400,
+            )
+        if len(data["section"]) > 20:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Section must be 20 characters or less",
+                    }
+                ),
+                400,
+            )
+        if len(data["professor_name"]) > 50:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Professor name must be 50 characters or less",
+                    }
+                ),
+                400,
+            )
+
         # Validate year and term
         try:
-            year = int(data['year'])
-            term = int(data['term'])
+            year = int(data["year"])
+            term = int(data["term"])
             if year < 2020 or year > 2100:
-                return jsonify({'success': False, 'message': 'Year must be between 2020 and 2100'}), 400
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "Year must be between 2020 and 2100",
+                        }
+                    ),
+                    400,
+                )
             if term not in [1, 2, 3]:
-                return jsonify({'success': False, 'message': 'Term must be 1 (Fall), 2 (Spring), or 3 (Summer)'}), 400
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "Term must be 1 (Fall), 2 (Spring), or 3 (Summer)",
+                        }
+                    ),
+                    400,
+                )
         except ValueError:
-            return jsonify({'success': False, 'message': 'Invalid year or term'}), 400
-        
-        # Check if course offering already exists
-        for course in test_course_offerings:
-            if course['title'].lower() == data['title'].lower() and \
-               course['section'].lower() == data['section'].lower() and \
-               course['year'] == year and \
-               course['term'] == term:
-                return jsonify({'success': False, 'message': 'This course offering already exists'}), 409
-        
-        # Generate new ID
-        new_id = max([course['id'] for course in test_course_offerings]) + 1 if test_course_offerings else 1
-        
-        # Create new course offering
+            return jsonify({"success": False, "message": "Invalid year or term"}), 400
+
+        duplicate = db.session.execute(
+            queries.course_duplicate_query,
+            {
+                "title": data["title"].lower(),
+                "section": data["section"].lower(),
+                "year": year,
+                "term": term,
+            },
+        ).first()
+        if duplicate:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "This course offering already exists",
+                    }
+                ),
+                409,
+            )
+
+        result = db.session.execute(
+            queries.insert_course_offering_query,
+            {
+                "title": data["title"],
+                "section": data["section"],
+                "year": year,
+                "term": term,
+                "professor_name": data["professor_name"],
+                "created_by_user": current_user.user_id,
+            },
+        )
+        db.session.commit()
+        new_id = result.lastrowid
+        if not new_id:
+            new_id = db.session.execute(
+                queries.latest_course_id_query
+            ).scalar()
+
         new_course = {
-            'id': new_id,
-            'title': data['title'],
-            'section': data['section'],
-            'year': year,
-            'term': term,
-            'professor_name': data['professor_name']
+            "id": new_id,
+            "title": data["title"],
+            "section": data["section"],
+            "year": year,
+            "term": term,
+            "professor_name": data["professor_name"],
         }
-        
-        test_course_offerings.append(new_course)
-        
-        return jsonify({'success': True, 'course': new_course})
+
+        return jsonify({"success": True, "course": new_course})
 
     @app.route("/404")
     def show_not_found():
