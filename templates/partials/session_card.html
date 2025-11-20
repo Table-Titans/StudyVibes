@@ -9,7 +9,7 @@
         {% endif %}
     {% endfor %}
 {% endif %}
-<div class="session_card {{ 'chill' if session.title.startswith('😎') else 'moderate' if session.title.startswith('🤓') else 'intense' if session.title.startswith('😤') else '' }}" 
+<div class="session_card {{ 'chill' if session.chill_level == 1 else 'moderate' if session.chill_level == 2 else 'intense' if session.chill_level == 3 else '' }}" 
      data-session-id="{{ session.id }}"
      data-course-id="{{ session.course_id if session.course_id else '' }}"
      data-location-id="{{ session.location_id if session.location_id else '' }}"

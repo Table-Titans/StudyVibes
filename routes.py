@@ -121,12 +121,68 @@ def register_routes(app, db):
 
     @app.route("/")
     def home():
-        inspector = inspect(db.engine)
-        table_names = inspector.get_table_names()
+        from sqlalchemy import text 
+        from models import Session
+        
+        query = text("""
+            SELECT 
+                s.session_id,
+                s.course_offering_id,
+                s.location_id,
+                s.organizer_id,
+                s.max_attendees,
+                s.description,
+                s.start_time,
+                s.end_time,
+                s.chill_level,
+                s.room_type_id,
+                c.title as course_title,
+                c.section as course_section,
+                l.address as location_address,
+                l.room_number as location_room
+            FROM StudySession s
+            INNER JOIN CourseOffering c ON s.course_offering_id = c.course_offering_id
+            INNER JOIN Location l ON s.location_id = l.location_id
+            ORDER BY s.start_time DESC
+        """)
+        
+        result = db.session.execute(query)
+        rows = result.fetchall()
+
+        db_sessions = []
+        for row in rows:
+            session_dict = {
+                'id': row.session_id,
+                'session_id': row.session_id,
+                'course_id': row.course_offering_id,
+                'location_id': row.location_id,
+                'organizer_id': row.organizer_id,
+                'max_attendees': row.max_attendees,
+                'description': row.description,
+                'start_time': row.start_time.isoformat() if row.start_time else None,
+                'end_time': row.end_time.isoformat() if row.end_time else None,
+                'chill_level': row.chill_level,
+                'room_type_id': row.room_type_id,
+                
+                # Title = Course title (from database)
+                'title': row.course_title or row.description or 'Study Session',
+                
+                # Location = Address + Room (from database)
+                'location': f"{row.location_address} - Room {row.location_room}" if row.location_address else 'TBD',
+                
+                # Time = Formatted start_time (from database)
+                'time': row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else 'TBD',
+                
+                # Attendees = TBD for now
+                'attendees': 'TBD',
+            }
+            db_sessions.append(session_dict)
+
+            
 
         return render_template("main_dashboard.html", 
                              my_sessions=my_sessions, 
-                             join_sessions=join_sessions,
+                             join_sessions=db_sessions,
                              courses=test_course_offerings,
                              locations=test_locations,
                              room_types=test_room_types,
@@ -296,11 +352,66 @@ def register_routes(app, db):
 
     @app.route("/sessions/<int:session_id>")
     def view_session(session_id):
-        session_record = find_session(session_id)
-        if not session_record:
-            abort(404)
+        
+        from sqlalchemy import text
+        from models import Session
 
-        context = build_session_context(session_record)
+        query = text("""
+            SELECT 
+                s.session_id,
+                s.course_offering_id,
+                s.location_id,
+                s.organizer_id,
+                s.max_attendees,
+                s.description,
+                s.start_time,
+                s.end_time,
+                s.chill_level,
+                s.room_type_id,
+                c.title as course_title,
+                c.section as course_section,
+                c.year as course_year,
+                c.term as course_term,
+                l.address as location_address,
+                l.room_number as location_room
+            FROM StudySession s
+            LEFT JOIN CourseOffering c ON s.course_offering_id = c.course_offering_id
+            LEFT JOIN Location l ON s.location_id = l.location_id
+            WHERE s.session_id = :session_id
+        """)
+        
+        result = db.session.execute(query, {"session_id": session_id})
+        row = result.fetchone()
+
+        if not row:
+            abort(404)
+        
+        # Build session dict with course and location
+        session_dict = {
+            'id': row.session_id,
+            'session_id': row.session_id,
+            'course_id': row.course_offering_id,
+            'location_id': row.location_id,
+            'organizer_id': row.organizer_id,
+            'max_attendees': row.max_attendees,
+            'description': row.description,
+            'start_time': row.start_time.isoformat() if row.start_time else None,
+            'end_time': row.end_time.isoformat() if row.end_time else None,
+            'chill_level': row.chill_level,
+            'room_type_id': row.room_type_id,
+            'title': row.course_title or row.description or 'Study Session',
+            'location': f"{row.location_address} - Room {row.location_room}" if row.location_address else 'TBD',
+            'time': row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else 'TBD',
+            'attendees': 'TBD',
+            'attendee_list': ['TBD'],
+            'organizer': 'TBD',
+            'tag_ids': [],
+            'resource_ids': [],
+            'reminder_ids': []
+        }
+        
+        # Build context for course and location details
+        context = build_session_context(session_dict)
 
         return render_template(
             "session.html",
