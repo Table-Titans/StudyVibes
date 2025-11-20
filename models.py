@@ -1,7 +1,8 @@
 """Application data models."""
 
+from datetime import datetime
+from flask_login import UserMixin
 from __init__ import db
-
 
 
 class Session(db.Model):
@@ -34,18 +35,42 @@ class Session(db.Model):
             'room_type_id': self.room_type_id
         }
 
-class User(db.Model):
+class User(db.Model, UserMixin):
     __tablename__ = "User"
-    
+
     user_id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(100), nullable=False)
-    # Add other user fields as needed
-    
+    email = db.Column(db.String(100), nullable=False, unique=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    first_name = db.Column(db.String(50), nullable=True)
+    last_name = db.Column(db.String(50), nullable=True)
+    phone = db.Column(db.String(20), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def get_id(self):
+        return str(self.user_id)
+
     def to_dict(self):
         return {
             'user_id': self.user_id,
-            'email': self.email
+            'email': self.email,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'phone': self.phone,
         }
+
+    @classmethod
+    def from_record(cls, record):
+        """Create a detached User instance from a SQLAlchemy Row object."""
+        mapping = record._mapping if hasattr(record, "_mapping") else record
+        data = dict(mapping)
+        user = cls()
+        user.user_id = data["user_id"]
+        user.email = data["email"]
+        user.password_hash = data.get("password_hash")
+        user.first_name = data.get("first_name")
+        user.last_name = data.get("last_name")
+        user.phone = data.get("phone")
+        return user
 
 class CourseOffering(db.Model):
     __tablename__ = "CourseOffering"

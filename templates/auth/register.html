@@ -12,10 +12,20 @@
         </div>
         <div class="login-box">
             <p class="intro-text">Create your StudyVibes account to get started.</p>
-            <form action="/register" method="POST">
-                <input type="text" name="name" placeholder="Full Name" required>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <ul class="flash-messages">
+                        {% for category, message in messages %}
+                            <li class="{{ category }}">{{ message }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            {% endwith %}
+            <form action="{{ url_for('register') }}" method="POST">
+                <input type="text" name="first_name" placeholder="First Name" required>
+                <input type="text" name="last_name" placeholder="Last Name" required>
                 <input type="email" name="email" placeholder="Email" required>
-                <input type="phone" name="phone" placeholder="Phone" required>
+                <input type="tel" name="phone" placeholder="Phone" pattern="[0-9]{10}" title="10 digit phone number" required>
                 <input type="password" name="password" placeholder="Password" required>
                 <input type="password" name="confirm_password" placeholder="Confirm Password" required>
                 <button type="submit">Sign Up</button>

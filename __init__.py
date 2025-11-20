@@ -7,13 +7,14 @@ from config import Config
 
 # Flask extensions (shared across modules)
 db = SQLAlchemy()
-# login_manager = LoginManager()
+login_manager = LoginManager()
+login_manager.login_view = "login"
 
 
 def register_extensions(app: Flask) -> None:
     """Attach shared extensions to the Flask app."""
     db.init_app(app)
-    # login_manager.init_app(app)
+    login_manager.init_app(app)
 
 
 def create_app():
@@ -31,3 +32,23 @@ def create_app():
     register_routes(app, db)
 
     return app
+
+
+@login_manager.user_loader
+def load_user(user_id: str):
+    """Fetch the logged-in user via a raw SQL query for Flask-Login."""
+    if not user_id:
+        return None
+
+    from sqlalchemy import text
+    from models import User
+
+    query = text("""
+        SELECT user_id, email, password_hash, first_name, last_name, phone
+        FROM User
+        WHERE user_id = :id
+    """)
+    result = db.session.execute(query, {"id": user_id}).first()
+    if not result:
+        return None
+    return User.from_record(result)
