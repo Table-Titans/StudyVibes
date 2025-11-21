@@ -204,7 +204,7 @@ def register_routes(app, db):
                 'attendees': row.attendance_count,
                 'is_organizer': row.organizer_id == current_user.user_id,
             }
-        all_sessions.append(session_dict)
+            all_sessions.append(session_dict)
         rows = db.session.execute(
             queries.user_sessions_query,
             {"id": current_user.user_id},
@@ -226,7 +226,7 @@ def register_routes(app, db):
                 'title': row.course_title or row.description or 'Study Session',
                 'location': f"{row.location_address} - Room {row.location_room}" if row.location_address else 'TBD',
                 'time': row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else 'TBD',
-                'attendees': 'TBD',
+                'attendees': row.attendance_count,
                 'is_organizer': row.organizer_id == current_user.user_id,  # Add this line
 
             }
@@ -475,7 +475,6 @@ def register_routes(app, db):
         )
 
         attendees = getAttendeesResult.fetchall()
-        print(attendees)
 
         attendees_formatted = []
         for attendee in attendees:
