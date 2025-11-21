@@ -125,15 +125,6 @@ fetch_all_tags_query = text("""
     FROM Tag
 """)
 
-fetch_all_attendees_query = text("""
-    SELECT 
-        first_name, 
-        LEFT(last_name, 1) AS last_init 
-    FROM User U 
-    JOIN Attendance A ON U.user_id = A.user_id
-    JOIN StudySession S ON S.session_id = A.session_id
-    WHERE S.session_id = :session_id
-""")
 list_all_sessions_query = text("""
     SELECT 
         s.session_id,
@@ -146,33 +137,19 @@ list_all_sessions_query = text("""
         s.end_time,
         s.chill_level,
         s.room_type_id,
-        c.title AS course_title,
+        c.title  AS course_title,
         c.section AS course_section,
         l.address AS location_address,
         l.room_number AS location_room,
-        COUNT(a.user_id) AS attendance_count
+        COALESCE(attendance_counts.attendance_count, 0) AS attendance_count
     FROM StudySession s
-    INNER JOIN CourseOffering c 
-        ON s.course_offering_id = c.course_offering_id
-    INNER JOIN Location l 
-        ON s.location_id = l.location_id
-    LEFT JOIN Attendance a 
-        ON a.session_id = s.session_id
-    GROUP BY 
-        s.session_id,
-        s.course_offering_id,
-        s.location_id,
-        s.organizer_id,
-        s.max_attendees,
-        s.description,
-        s.start_time,
-        s.end_time,
-        s.chill_level,
-        s.room_type_id,
-        c.title,
-        c.section,
-        l.address,
-        l.room_number
+    INNER JOIN CourseOffering c ON s.course_offering_id = c.course_offering_id
+    INNER JOIN Location l       ON s.location_id = l.location_id
+    LEFT  JOIN (
+        SELECT session_id, COUNT(*) AS attendance_count
+        FROM Attendance
+        GROUP BY session_id
+    ) attendance_counts ON attendance_counts.session_id = s.session_id
     ORDER BY s.start_time DESC;
 """)
 
