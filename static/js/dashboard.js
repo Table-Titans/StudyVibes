@@ -62,6 +62,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    const deleteButtons = document.querySelectorAll('.delete-session');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            if (!confirm('Are you sure you want to delete this session? All attendance records will be removed.')) {
+                return;
+            }
+            const sessionId = this.getAttribute('data-session-id');
+            this.disabled = true;
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/sessions/${sessionId}/delete`;
+            document.body.appendChild(form);
+            form.submit();
+        });
+    });
+
     // Filter Panel Toggle
     const filterToggle = document.getElementById('filterToggle');
     const filterPanel = document.getElementById('filterPanel');

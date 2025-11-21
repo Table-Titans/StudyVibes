@@ -353,6 +353,34 @@ delete_attendance_query = text("""
     WHERE session_id = :session_id AND user_id = :user_id
 """)
 
+update_session_query = text("""
+    UPDATE StudySession
+    SET course_offering_id = :course_id,
+        location_id = :location_id,
+        max_attendees = :max_attendees,
+        description = :description,
+        start_time = :start_time,
+        end_time = :end_time,
+        chill_level = :chill_level,
+        room_type_id = :room_type_id
+    WHERE session_id = :session_id
+""")
+
+delete_session_attendance_query = text("""
+    DELETE FROM Attendance
+    WHERE session_id = :session_id
+""")
+
+delete_session_tags_query = text("""
+    DELETE FROM SessionTag
+    WHERE session_id = :session_id
+""")
+
+delete_session_query = text("""
+    DELETE FROM StudySession
+    WHERE session_id = :session_id
+""")
+
 search_locations_query = text("""
     SELECT 
         location_id AS id,

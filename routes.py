@@ -184,6 +184,7 @@ def register_routes(app, db):
         result = db.session.execute(queries.list_all_sessions_query)
         rows = result.fetchall()
         all_sessions = []
+
         for row in rows:
             session_dict = {
                 'id': row.session_id,
@@ -203,8 +204,7 @@ def register_routes(app, db):
                 'attendees': row.attendance_count,
                 'is_organizer': row.organizer_id == current_user.user_id,
             }
-            all_sessions.append(session_dict)
-        print(all_sessions)
+        all_sessions.append(session_dict)
         rows = db.session.execute(
             queries.user_sessions_query,
             {"id": current_user.user_id},
@@ -227,6 +227,8 @@ def register_routes(app, db):
                 'location': f"{row.location_address} - Room {row.location_room}" if row.location_address else 'TBD',
                 'time': row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else 'TBD',
                 'attendees': 'TBD',
+                'is_organizer': row.organizer_id == current_user.user_id,  # Add this line
+
             }
             my_sessions.append(session_dict)
 
@@ -447,6 +449,9 @@ def register_routes(app, db):
     @app.route("/sessions/<int:session_id>")
     @login_required
     def view_session(session_id):
+
+        checkOrganizer = False
+
         result = db.session.execute(
             queries.view_session_query, {"session_id": session_id}
         )
@@ -513,6 +518,7 @@ def register_routes(app, db):
             course=context['course'],
             location=context['location'],
             attendees=context['attendees'],
+            isOrganizer=checkOrganizer,
         )
 
     @app.route("/sessions/<int:session_id>/resources", methods=['POST'])
@@ -619,6 +625,141 @@ def register_routes(app, db):
                 {"success": True, "message": "Successfully left the session"}
             )
         return jsonify({"success": False, "message": "Session not found"}), 404
+
+    @app.route("/sessions/<int:session_id>/edit", methods=['GET', 'POST'])
+    @login_required
+    def edit_session(session_id):
+        result = db.session.execute(
+            queries.view_session_query, {"session_id": session_id}
+        )
+        row = result.fetchone()
+
+        if not row:
+            abort(404)
+
+        if current_user.user_id != row.organizer_id:
+            flash('Only the organizer can edit this session.', 'error')
+            return redirect(url_for('view_session', session_id=session_id))
+
+        if request.method == 'POST':
+            course_id = request.form.get('course_id', type=int)
+            location_id = request.form.get('location_id', type=int)
+            max_attendees = request.form.get('max_attendees', type=int)
+            description = request.form.get('description')
+            start_time = request.form.get('start_time')
+            end_time = request.form.get('end_time')
+            chill_level = request.form.get('chill_level', type=int)
+            room_type_id = request.form.get('room_type_id', type=int)
+            tag_ids = []
+            for raw_tag in request.form.getlist('tags'):
+                tag_ids.append(int(raw_tag))
+
+            if not course_id or not location_id:
+                flash('Please pick a course and location from the list.', 'error')
+                return redirect(request.url)
+
+            if not max_attendees or not description or not start_time or not end_time or not chill_level or not room_type_id:
+                flash('All required fields must be filled out.', 'error')
+                return redirect(request.url)
+
+            start_value = start_time.replace("T", " ")
+            end_value = end_time.replace("T", " ")
+
+            db.session.execute(
+                queries.update_session_query,
+                {
+                    "session_id": session_id,
+                    "course_id": course_id,
+                    "location_id": location_id,
+                    "max_attendees": max_attendees,
+                    "description": description,
+                    "start_time": start_value,
+                    "end_time": end_value,
+                    "chill_level": chill_level,
+                    "room_type_id": room_type_id,
+                },
+            )
+
+            db.session.execute(
+                queries.delete_session_tags_query,
+                {"session_id": session_id}
+            )
+
+            for tag_id in tag_ids:
+                db.session.execute(
+                    queries.insert_session_tag_query,
+                    {"session_id": session_id, "tag_id": tag_id},
+                )
+
+            db.session.commit()
+            
+            flash('Session updated successfully!', 'success')
+            return redirect(url_for('view_session', session_id=session_id))
+
+        session_dict = {
+            'id': row.session_id,
+            'course_id': row.course_offering_id,
+            'location_id': row.location_id,
+            'organizer_id': row.organizer_id,
+            'max_attendees': row.max_attendees,
+            'description': row.description,
+            'start_time': row.start_time.strftime('%Y-%m-%dT%H:%M') if row.start_time else '',
+            'end_time': row.end_time.strftime('%Y-%m-%dT%H:%M') if row.end_time else '',
+            'chill_level': row.chill_level,
+            'room_type_id': row.room_type_id,
+        }
+
+        course = find_course(row.course_offering_id)
+        location = find_location(row.location_id)
+        session_tag_ids = get_session_tag_ids(session_id)
+        
+        course_display = f"{course['title']} - Section {course['section']} ({course['professor_name']})" if course else ''
+        location_display = f"{location['address']} - Room {location['room_number']}" if location else ''
+
+        return render_template(
+            "edit_session.html",
+            session=session_dict,
+            course_display=course_display,
+            location_display=location_display,
+            room_types=fetch_all_room_types(),
+            tags=fetch_all_tags(),
+            session_tag_ids=session_tag_ids
+        )
+
+    @app.route("/sessions/<int:session_id>/delete", methods=['POST'])
+    @login_required
+    def delete_session(session_id):
+        result = db.session.execute(
+            queries.view_session_query, {"session_id": session_id}
+        )
+        row = result.fetchone()
+
+        if not row:
+            abort(404)
+
+        if current_user.user_id != row.organizer_id:
+            flash('Only the organizer can delete this session.', 'error')
+            return redirect(url_for('view_session', session_id=session_id))
+
+        db.session.execute(
+            queries.delete_session_attendance_query,
+            {"session_id": session_id}
+        )
+
+        db.session.execute(
+            queries.delete_session_tags_query,
+            {"session_id": session_id}
+        )
+
+        db.session.execute(
+            queries.delete_session_query,
+            {"session_id": session_id}
+        )
+
+        db.session.commit()
+
+        flash('Session deleted successfully!', 'success')
+        return redirect(url_for('home'))
 
     # API endpoints for locations
     @app.route("/api/locations", methods=["GET"])

@@ -1412,3 +1412,71 @@ body {
 .resource-upload-form small {
     color: #666;
 }
+
+.session-header-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.session-organizer-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.session-organizer-actions .edit-btn,
+.session-organizer-actions .delete-btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+    border: none;
+}
+
+.session-organizer-actions .edit-btn {
+    background: linear-gradient(135deg, #6f1fb6 0%, #904fca 100%);
+    color: white;
+}
+
+.session-organizer-actions .edit-btn:hover {
+    background: linear-gradient(135deg, #904fca 0%, #6f1fb6 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(111, 31, 182, 0.3);
+}
+
+.session-organizer-actions .delete-btn {
+    background: #dc3545;
+    color: white;
+}
+
+.session-organizer-actions .delete-btn:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+.session-card-actions .edit-session {
+    background: linear-gradient(135deg, #6f1fb6 0%, #904fca 100%);
+    text-decoration: none;
+    display: inline-block;
+}
+
+.session-card-actions .edit-session:hover {
+    background: linear-gradient(135deg, #904fca 0%, #6f1fb6 100%);
+}
+
+.session-card-actions .delete-session {
+    background: #dc3545;
+}
+
+.session-card-actions .delete-session:hover {
+    background: #c82333;
+}
