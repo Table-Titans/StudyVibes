@@ -102,6 +102,16 @@ fetch_all_courses_query = text("""
     FROM CourseOffering
 """)
 
+fetch_all_attendees_query = text("""
+    SELECT 
+        first_name, 
+        LEFT(last_name, 1) AS last_init 
+    FROM User U 
+    JOIN Attendance A ON U.user_id = A.user_id
+    JOIN StudySession S ON S.session_id = A.session_id
+    WHERE S.session_id = :session_id
+""")
+
 fetch_all_locations_query = text("""
     SELECT 
         location_id AS id,
@@ -137,24 +147,38 @@ list_all_sessions_query = text("""
         s.end_time,
         s.chill_level,
         s.room_type_id,
-        c.title  AS course_title,
+        c.title AS course_title,
         c.section AS course_section,
         l.address AS location_address,
         l.room_number AS location_room,
-        COALESCE(attendance_counts.attendance_count, 0) AS attendance_count
+        COUNT(a.user_id) AS attendance_count
     FROM StudySession s
-    INNER JOIN CourseOffering c ON s.course_offering_id = c.course_offering_id
-    INNER JOIN Location l       ON s.location_id = l.location_id
-    LEFT  JOIN (
-        SELECT session_id, COUNT(*) AS attendance_count
-        FROM Attendance
-        GROUP BY session_id
-    ) attendance_counts ON attendance_counts.session_id = s.session_id
+    INNER JOIN CourseOffering c 
+        ON s.course_offering_id = c.course_offering_id
+    INNER JOIN Location l 
+        ON s.location_id = l.location_id
+    LEFT JOIN Attendance a 
+        ON a.session_id = s.session_id
+    GROUP BY 
+        s.session_id,
+        s.course_offering_id,
+        s.location_id,
+        s.organizer_id,
+        s.max_attendees,
+        s.description,
+        s.start_time,
+        s.end_time,
+        s.chill_level,
+        s.room_type_id,
+        c.title,
+        c.section,
+        l.address,
+        l.room_number
     ORDER BY s.start_time DESC;
 """)
 
 user_sessions_query = text("""
-    (
+        (
         SELECT 
             s.session_id,
             s.course_offering_id,
@@ -166,14 +190,20 @@ user_sessions_query = text("""
             s.end_time,
             s.chill_level,
             s.room_type_id,
-            c.title AS course_title,
+            c.title  AS course_title,
             c.section AS course_section,
             l.address AS location_address,
-            l.room_number AS location_room
+            l.room_number AS location_room,
+            COALESCE(ac.attendance_count, 0) AS attendance_count
         FROM StudySession s
         INNER JOIN Attendance a ON s.session_id = a.session_id
-        LEFT JOIN CourseOffering c ON s.course_offering_id = c.course_offering_id
-        LEFT JOIN Location l ON s.location_id = l.location_id
+        LEFT  JOIN CourseOffering c ON s.course_offering_id = c.course_offering_id
+        LEFT  JOIN Location l ON s.location_id = l.location_id
+        LEFT  JOIN (
+            SELECT session_id, COUNT(*) AS attendance_count
+            FROM Attendance
+            GROUP BY session_id
+        ) ac ON ac.session_id = s.session_id
         WHERE a.user_id = :id
     )
     UNION
@@ -189,16 +219,23 @@ user_sessions_query = text("""
             s.end_time,
             s.chill_level,
             s.room_type_id,
-            c.title AS course_title,
+            c.title  AS course_title,
             c.section AS course_section,
             l.address AS location_address,
-            l.room_number AS location_room
+            l.room_number AS location_room,
+            COALESCE(ac.attendance_count, 0) AS attendance_count
         FROM StudySession s
         LEFT JOIN CourseOffering c ON s.course_offering_id = c.course_offering_id
-        LEFT JOIN Location l ON s.location_id = l.location_id
+        LEFT JOIN Location l       ON s.location_id = l.location_id
+        LEFT JOIN (
+            SELECT session_id, COUNT(*) AS attendance_count
+            FROM Attendance
+            GROUP BY session_id
+        ) ac ON ac.session_id = s.session_id
         WHERE s.organizer_id = :id
     )
-    ORDER BY start_time DESC
+    ORDER BY start_time DESC;
+
 """)
 
 login_lookup_query = text("""

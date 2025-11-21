@@ -183,7 +183,6 @@ def register_routes(app, db):
     def home():
         result = db.session.execute(queries.list_all_sessions_query)
         rows = result.fetchall()
-        print(rows)
         all_sessions = []
 
         for row in rows:
