@@ -201,13 +201,10 @@ def register_routes(app, db):
                 'title': row.course_title or row.description or 'Study Session',
                 'location': f"{row.location_address} - Room {row.location_room}" if row.location_address else 'TBD',
                 'time': row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else 'TBD',
-                'attendees': 'TBD',
+                'attendees': row.attendance_count,
                 'is_organizer': row.organizer_id == current_user.user_id,
-
             }
-            all_sessions.append(session_dict)
-
-        
+        all_sessions.append(session_dict)
         rows = db.session.execute(
             queries.user_sessions_query,
             {"id": current_user.user_id},
@@ -460,13 +457,34 @@ def register_routes(app, db):
         )
         row = result.fetchone()
 
-        if (current_user.user_id == row.organizer_id):
-            checkOrganizer = True
-
-
         if not row:
             abort(404)
         
+        if (current_user.user_id == row.organizer_id):
+            checkOrganizer = True
+        
+        getOrganizerResult = db.session.execute(
+            queries.fetch_user_by_id_query, {"user_id": row.organizer_id}
+        )
+
+        organizer = getOrganizerResult.fetchone()
+        organizer_name = organizer.first_name + " " + organizer.last_name[0] + "."
+
+        getAttendeesResult = db.session.execute(
+            queries.fetch_all_attendees_query, {"session_id": session_id}
+        )
+
+        attendees = getAttendeesResult.fetchall()
+        print(attendees)
+
+        attendees_formatted = []
+        for attendee in attendees:
+            attendees_formatted.append(attendee.first_name + " " + attendee.last_init + ".")
+
+        attendees_count = len(attendees_formatted)    
+        
+        print(attendees_formatted)
+
         # Build session dict with course and location
         session_dict = {
             'id': row.session_id,
@@ -483,9 +501,9 @@ def register_routes(app, db):
             'title': row.course_title or row.description or 'Study Session',
             'location': f"{row.location_address} - Room {row.location_room}" if row.location_address else 'TBD',
             'time': row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else 'TBD',
-            'attendees': 'TBD',
-            'attendee_list': ['TBD'],
-            'organizer': 'TBD',
+            'attendees': str(attendees_count),
+            'attendee_list': attendees_formatted,
+            'organizer': organizer_name,
             'tag_ids': [],
             'resource_ids': [],
             'reminder_ids': []
@@ -493,8 +511,6 @@ def register_routes(app, db):
         
         # Build context for course and location details
         context = build_session_context(session_dict)
-
-        print(checkOrganizer)
 
         return render_template(
             "session.html",
