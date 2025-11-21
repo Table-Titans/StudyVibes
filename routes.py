@@ -200,19 +200,11 @@ def register_routes(app, db):
                 'title': row.course_title or row.description or 'Study Session',
                 'location': f"{row.location_address} - Room {row.location_room}" if row.location_address else 'TBD',
                 'time': row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else 'TBD',
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-                'attendees': 'TBD',
-=======
-=======
->>>>>>> Stashed changes
                 'attendees': row.attendance_count,
                 'is_organizer': row.organizer_id == current_user.user_id,
-
->>>>>>> Stashed changes
             }
             all_sessions.append(session_dict)
-        
+        print(all_sessions)
         rows = db.session.execute(
             queries.user_sessions_query,
             {"id": current_user.user_id},
