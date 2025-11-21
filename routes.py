@@ -201,8 +201,11 @@ def register_routes(app, db):
                 'location': f"{row.location_address} - Room {row.location_room}" if row.location_address else 'TBD',
                 'time': row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else 'TBD',
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
                 'attendees': 'TBD',
 =======
+=======
+>>>>>>> Stashed changes
                 'attendees': row.attendance_count,
                 'is_organizer': row.organizer_id == current_user.user_id,
 
