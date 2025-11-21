@@ -45,7 +45,12 @@
     </a>
     <div class="session-card-actions">
         {% if section == 'my_sessions' %}
-            <button class="action leave-session" data-session-id="{{ session.id }}">Leave Session</button>
+            {% if session.is_organizer %}
+                <a href="{{ url_for('edit_session', session_id=session.id) }}" class="action edit-session">Edit Session</a>
+                <button class="action delete-session" data-session-id="{{ session.id }}">Delete Session</button>
+            {% else %}
+                <button class="action leave-session" data-session-id="{{ session.id }}">Leave Session</button>
+            {% endif %}
         {% else %}
             <button class="action join-session" data-session-id="{{ session.id }}">Join Session</button>
         {% endif %}
