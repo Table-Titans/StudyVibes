@@ -14,7 +14,7 @@
 
 {% set description_text = session_data.get('description') or (description if description is defined else None) %}
 {% set notes_text = session_data.get('notes') or (notes if notes is defined else None) %}
-{% set organizer_name = session_data.get('organizer') or (organizer if organizer is defined else None) %}
+{% set organizer_name = session_data.get('organizer')%}
 {% set start_value = session_data.get('start_time') or (start_time if start_time is defined else None) %}
 {% set end_value = session_data.get('end_time') or (end_time if end_time is defined else None) %}
 
@@ -114,7 +114,7 @@
         <div class="session-summary-grid">
             <div class="summary-card">
                 <span class="summary-label">Organizer</span>
-                <span class="summary-value">{{ organizer_name or "TBD" }}</span>
+                <span class="summary-value">{{ organizer_name}}</span>
             </div>
             <div class="summary-card">
                 <span class="summary-label">Start Time</span>
