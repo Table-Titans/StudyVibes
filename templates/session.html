@@ -165,7 +165,15 @@
             </div>
 
             <div class="session-card">
-                <h2 class="session-section-title">Session Resources</h2>
+                <h2 class="session-section-title">
+                    Session Resources
+                    <a href="#resource-upload-{{ session_data.id }}"
+                       class="upload-link"
+                       style="font-size: 12px; font-weight: 600; color: #2563eb; text-decoration: none; margin-left: 8px;"
+                       onclick="var input=document.getElementById('resource_file_upload_{{ session_data.id }}'); if(input){ input.click(); } return false;">
+                        Upload Resource
+                    </a>
+                </h2>
                 {% if session_resources %}
                     <ul class="resource-list">
                         {% for resource in session_resources %}
@@ -179,21 +187,19 @@
                 {% else %}
                     <p>No resources uploaded yet.</p>
                 {% endif %}
-                {% if is_organizer %}
-                    <form method="POST"
-                          action="{{ url_for('upload_session_resource', session_id=session_data.id) }}"
-                          enctype="multipart/form-data"
-                          class="resource-upload-form">
-                        <label for="resource_file_upload_{{ session_data.id }}">Add a new resource (txt or pdf)</label>
-                        <input type="file"
-                               id="resource_file_upload_{{ session_data.id }}"
-                               name="resource_file"
-                               accept=".txt,.pdf"
-                               required>
-                        <button type="submit" class="submit-btn">Upload Resource</button>
-                        <small>The upload creates a placeholder CDN link until storage is ready.</small>
-                    </form>
-                {% endif %}
+                <form method="POST"
+                      action="{{ url_for('upload_session_resource', session_id=session_data.id) }}"
+                      enctype="multipart/form-data"
+                      class="resource-upload-form"
+                      id="resource-upload-{{ session_data.id }}">
+                    <input type="file"
+                           id="resource_file_upload_{{ session_data.id }}"
+                           name="resource_file"
+                           accept=".txt,.pdf,.png,.jpg,.jpeg"
+                           style="display:none;"
+                           onchange="if(this.files.length){ this.form.submit(); }">
+                    <small style="display:block; margin-top:6px; color:#555;">Upload a .txt, .pdf, .png, or .jpg and it will be saved to the database.</small>
+                </form>
             </div>
 
             <div class="session-card">

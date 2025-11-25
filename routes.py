@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from flask import render_template, request, redirect, url_for, flash, jsonify, abort, current_app
+from flask import render_template, request, redirect, url_for, flash, jsonify, abort, current_app, Response
 from flask_login import (
     current_user,
     login_required,
@@ -92,7 +92,12 @@ def register_routes(app, db):
             queries.get_resources_for_session_query,
             {"session_id": session_id},
         ).fetchall()
-        return [dict(row._mapping) for row in rows]
+        resources = []
+        for row in rows:
+            item = dict(row._mapping)
+            item["resource_url"] = url_for("download_resource", resource_id=item["id"])
+            resources.append(item)
+        return resources
 
     def get_reminders_for_session(session_id):
         rows = db.session.execute(
@@ -106,6 +111,28 @@ def register_routes(app, db):
             reminders.append(reminder_copy)
         return reminders
 
+    def allowed_resource(filename):
+        if not filename or "." not in filename:
+            return False
+        extension = filename.rsplit(".", 1)[-1].lower()
+        return extension in ("txt", "pdf", "png", "jpg", "jpeg")
+
+    def build_payload(file_obj):
+        filename = secure_filename(file_obj.filename)
+        extension = filename.rsplit(".", 1)[-1].lower()
+        resource_kind = "text"
+        resource_text = None
+        resource_hex = None
+        mime_type = "text/plain"
+        content = file_obj.read()
+        if extension in ("png", "jpg", "jpeg"):
+            resource_kind = "image"
+            resource_hex = content.hex()
+            mime_type = "image/png" if extension == "png" else "image/jpeg"
+        else:
+            resource_text = content.decode("utf-8")
+        return filename, resource_kind, resource_text, resource_hex, mime_type
+
     def format_datetime_string(value):
         if not value:
             return None
@@ -118,6 +145,22 @@ def register_routes(app, db):
                 return value
         formatted = dt.strftime("%B %d, %Y %I:%M %p")
         return formatted.replace(" 0", " ").lstrip("0")
+
+    @app.route("/resources/<int:resource_id>")
+    @login_required
+    def download_resource(resource_id):
+        row = db.session.execute(
+            queries.fetch_resource_by_id_query,
+            {"resource_id": resource_id},
+        ).first()
+        if not row:
+            abort(404)
+        if row.resource_kind == "image" and row.resource_hex:
+            data = bytes.fromhex(row.resource_hex)
+            return Response(data, mimetype=row.mime_type or "application/octet-stream")
+        if row.resource_kind == "text" and row.resource_text is not None:
+            return Response(row.resource_text, mimetype=row.mime_type or "text/plain")
+        return abort(404)
 
     def fetch_all_courses():
         rows = db.session.execute(queries.fetch_all_courses_query).fetchall()
@@ -353,6 +396,7 @@ def register_routes(app, db):
                 except (TypeError, ValueError):
                     continue
             resource_file = request.files.get('resource_file')
+            resource_payload = None
 
             if not course_id or not location_id:
                 flash('Please pick a course and location from the list.', 'error')
@@ -363,19 +407,10 @@ def register_routes(app, db):
                 return redirect(request.url)
 
             if resource_file and resource_file.filename:
-                filename = secure_filename(resource_file.filename)
-                if '.' not in filename:
-                    flash('Resources must have a .txt or .pdf extension.', 'error')
+                if not allowed_resource(resource_file.filename):
+                    flash('Resources must have a .txt, .pdf, .png, or .jpg extension.', 'error')
                     return redirect(request.url)
-                extension = filename.rsplit('.', 1)[-1].lower()
-                if extension not in ('txt', 'pdf'):
-                    flash('Resources must be a text or PDF file.', 'error')
-                    return redirect(request.url)
-                resource_name = filename
-                resource_url = f"https://cdn.example.com/uploads/{filename}"
-            else:
-                resource_name = None
-                resource_url = None
+                resource_payload = build_payload(resource_file)
 
             selected_course = find_course(course_id)
             selected_location = find_location(location_id)
@@ -413,14 +448,18 @@ def register_routes(app, db):
                 {"user_id": current_user.user_id, "session_id": new_session_id},
             )
 
-            if resource_name and resource_url:
+            if resource_payload:
+                filename, resource_kind, resource_text, resource_hex, mime_type = resource_payload
                 db.session.execute(
-                    queries.insert_resource_query,
+                    queries.insert_resource_payload_query,
                     {
                         "session_id": new_session_id,
                         "uploaded_by": current_user.user_id,
-                        "resource_name": resource_name,
-                        "resource_url": resource_url,
+                        "resource_name": filename,
+                        "resource_kind": resource_kind,
+                        "resource_text": resource_text,
+                        "resource_hex": resource_hex,
+                        "mime_type": mime_type,
                     },
                 )
 
@@ -481,8 +520,6 @@ def register_routes(app, db):
             attendees_formatted.append(attendee.first_name + " " + attendee.last_init + ".")
 
         attendees_count = len(attendees_formatted)    
-        
-        print(attendees_formatted)
 
         # Build session dict with course and location
         session_dict = {
@@ -527,40 +564,33 @@ def register_routes(app, db):
         if not session_record:
             abort(404)
 
-        organizer_id = session_record.get('organizer_id')
-        if organizer_id != current_user.user_id:
-            flash('Only the session organizer can upload resources for now.', 'error')
-            return redirect(url_for('view_session', session_id=session_id))
-
         resource_file = request.files.get('resource_file')
         if not resource_file or not resource_file.filename:
-            flash('Please choose a text or PDF file to upload.', 'error')
+            flash('Please choose a txt, pdf, png, or jpg file to upload.', 'error')
             return redirect(url_for('view_session', session_id=session_id))
 
         filename = secure_filename(resource_file.filename)
-        if '.' not in filename:
-            flash('Resources must have a .txt or .pdf extension.', 'error')
+        if not allowed_resource(filename):
+            flash('Resources must have a .txt, .pdf, .png, or .jpg extension.', 'error')
             return redirect(url_for('view_session', session_id=session_id))
 
-        extension = filename.rsplit('.', 1)[-1].lower()
-        if extension not in ('txt', 'pdf'):
-            flash('Resources must be a text or PDF file.', 'error')
-            return redirect(url_for('view_session', session_id=session_id))
-
-        fake_url = f"https://cdn.example.com/uploads/{filename}"
+        filename, resource_kind, resource_text, resource_hex, mime_type = build_payload(resource_file)
 
         db.session.execute(
-            queries.insert_resource_query,
+            queries.insert_resource_payload_query,
             {
                 "session_id": session_id,
                 "uploaded_by": current_user.user_id,
                 "resource_name": filename,
-                "resource_url": fake_url,
+                "resource_kind": resource_kind,
+                "resource_text": resource_text,
+                "resource_hex": resource_hex,
+                "mime_type": mime_type,
             },
         )
         db.session.commit()
 
-        flash('Resource uploaded. The CDN link is a placeholder until storage is in place.', 'success')
+        flash('Resource uploaded.', 'success')
         return redirect(url_for('view_session', session_id=session_id))
 
     @app.route("/join_session/<int:session_id>", methods=['POST'])
