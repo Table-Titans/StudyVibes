@@ -98,20 +98,15 @@
             {% endif %}
         </div>
 
-
         <div class="session-header">
-            {% if chill_display %}
-                <div class="session-chill-emoji session-chill-large">
-                    {{ chill_display }}
+                <div class="session-header-main">
+                    <div class="session-chill-emoji session-chill-large">
+                        {{ chill_display }}
+                    </div>
+                    <h1 class="session-title">
+                        {{ session_data.title }}
+                    </h1>
                 </div>
-            {% endif %}
-            <div class="session-header-text">
-                <h1 class="session-title">
-                    {{ session_data.title if session_data.title is defined and session_data.title else "Study Session Overview" }}
-                </h1>
-                <p class="session-subtitle">
-                    {{ course_title if course_title else "Stay on track with the full session details" }}
-                </p>
                 {% if session_tags %}
                     <div class="session-tag-group">
                         {% for tag in session_tags %}
@@ -119,7 +114,6 @@
                         {% endfor %}
                     </div>
                 {% endif %}
-            </div>
         </div>
 
         <div class="session-summary-grid">
@@ -142,25 +136,43 @@
             <div class="summary-card">
                 <span class="summary-label">Room Type</span>
                 <span class="summary-value">
-                    {% if room_type_info %}
-                        {{ room_type_info.type_name }}
-                    {% else %}
-                        TBD
-                    {% endif %}
+                    {{ room_type_info.type_name }}
                 </span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">Space Details</span>
+                <p>
+                    {{ room_type_info.description }}
+                </p>
             </div>
         </div>
 
         <div class="session-sections">
             <div class="session-card">
-                <h2 class="session-section-title">Notes &amp; Description</h2>
-                {% if description_text %}
-                    <p>{{ description_text }}</p>
+                <h2 class="session-section-title">Email Reminder</h2>
+                {% if user_has_reminder %}
+                    <p>You will get an email 2 hours before this session starts.</p>
+                    <form method="POST" action="{{ url_for('toggle_reminder', session_id=session_data.id) }}">
+                        <input type="hidden" name="action" value="remove">
+                        <button type="submit" class="submit-btn">Cancel reminder</button>
+                    </form>
                 {% else %}
-                    <p>No detailed description has been added yet.</p>
+                    <form method="POST" action="{{ url_for('toggle_reminder', session_id=session_data.id) }}">
+                        <input type="hidden" name="action" value="add">
+                        <button type="submit" class="submit-btn">Email me 2 hours before</button>
+                    </form>
                 {% endif %}
-                {% if notes_text %}
-                    <p class="notes-highlight">{{ notes_text }}</p>
+                {% if session_reminders %}
+                    <ul class="reminder-list">
+                        {% for reminder in session_reminders %}
+                            <li>
+                                <strong>{{ reminder.display_time or reminder.reminder_time }}</strong>
+                                – {{ "Sent" if reminder.reminder_sent else "Pending" }}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p>No email reminders scheduled yet.</p>
                 {% endif %}
             </div>
 
@@ -195,26 +207,22 @@
                     <input type="file"
                            id="resource_file_upload_{{ session_data.id }}"
                            name="resource_file"
-                           accept=".txt,.pdf,.png,.jpg,.jpeg"
+                           accept=".txt,.png,.jpg,.jpeg"
                            style="display:none;"
                            onchange="if(this.files.length){ this.form.submit(); }">
-                    <small style="display:block; margin-top:6px; color:#555;">Upload a .txt, .pdf, .png, or .jpg and it will be saved to the database.</small>
+                    <small style="display:block; margin-top:6px; color:#555;">Upload a .txt, .png, or .jpg and it will be saved to the database.</small>
                 </form>
             </div>
 
             <div class="session-card">
-                <h2 class="session-section-title">Email Reminder</h2>
-                {% if session_reminders %}
-                    <ul class="reminder-list">
-                        {% for reminder in session_reminders %}
-                            <li>
-                                <strong>{{ reminder.display_time or reminder.reminder_time }}</strong>
-                                – {{ "Sent" if reminder.reminder_sent else "Pending" }}
-                            </li>
-                        {% endfor %}
-                    </ul>
+                <h2 class="session-section-title">Notes &amp; Description</h2>
+                {% if description_text %}
+                    <p>{{ description_text }}</p>
                 {% else %}
-                    <p>No email reminders scheduled yet.</p>
+                    <p>No detailed description has been added yet.</p>
+                {% endif %}
+                {% if notes_text %}
+                    <p class="notes-highlight">{{ notes_text }}</p>
                 {% endif %}
             </div>
 
@@ -258,15 +266,6 @@
                 </div>
             </div>
 
-            <div class="session-card">
-                <h2 class="session-section-title">Space Details</h2>
-                {% if room_type_info %}
-                    <p><strong>{{ room_type_info.type_name }}</strong></p>
-                    <p>{{ room_type_info.description }}</p>
-                {% else %}
-                    <p>The room type for this session has not been set yet.</p>
-                {% endif %}
-            </div>
 
             <div class="session-card map-card">
                 <h2 class="session-section-title">Where to Meet</h2>
