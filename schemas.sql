@@ -75,7 +75,10 @@ CREATE TABLE Resource (
     session_id INT,
     uploaded_by INT,
     resource_name VARCHAR(50),
-    resource_url TEXT,
+    resource_kind ENUM('text','image') DEFAULT 'text',
+    resource_text LONGTEXT,
+    resource_hex LONGTEXT,
+    mime_type VARCHAR(50),
     FOREIGN KEY (session_id) REFERENCES StudySession(session_id),
     FOREIGN KEY (uploaded_by) REFERENCES User(user_id)
 );

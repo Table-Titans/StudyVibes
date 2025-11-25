@@ -74,7 +74,10 @@ get_resources_for_session_query = text("""
         resource_id AS id,
         session_id,
         resource_name,
-        resource_url,
+        resource_kind,
+        resource_text,
+        resource_hex,
+        mime_type,
         uploaded_by
     FROM Resource
     WHERE session_id = :session_id
@@ -296,8 +299,27 @@ insert_attendance_query = text("""
 """)
 
 insert_resource_query = text("""
-    INSERT INTO Resource (session_id, uploaded_by, resource_name, resource_url)
-    VALUES (:session_id, :uploaded_by, :resource_name, :resource_url)
+    INSERT INTO Resource (session_id, uploaded_by, resource_name, resource_kind, resource_text, resource_hex, mime_type)
+    VALUES (:session_id, :uploaded_by, :resource_name, :resource_kind, :resource_text, :resource_hex, :mime_type)
+""")
+
+insert_resource_payload_query = text("""
+    INSERT INTO Resource (session_id, uploaded_by, resource_name, resource_kind, resource_text, resource_hex, mime_type)
+    VALUES (:session_id, :uploaded_by, :resource_name, :resource_kind, :resource_text, :resource_hex, :mime_type)
+""")
+
+fetch_resource_by_id_query = text("""
+    SELECT 
+        resource_id,
+        session_id,
+        resource_name,
+        resource_kind,
+        resource_text,
+        resource_hex,
+        mime_type
+    FROM Resource
+    WHERE resource_id = :resource_id
+    LIMIT 1
 """)
 
 insert_reminder_query = text("""
