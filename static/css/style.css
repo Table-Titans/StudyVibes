@@ -845,11 +845,19 @@ body {
 
 .session-header {
     display: flex;
-    align-items: flex-start;
-    gap: 20px;
-    text-align: left;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    text-align: center;
     margin-bottom: 35px;
     padding-top: 30px;
+}
+
+.session-header-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
 }
 
 .session-header-text {
@@ -1303,27 +1311,6 @@ body {
 
 .autocomplete-item.create-new:hover {
     background: linear-gradient(135deg, #8e44ad 0%, #6f1fb6 100%);
-}
-
-/* Responsive modal */
-@media (max-width: 768px) {
-    .modal-content {
-        width: 95%;
-        margin: 10% auto;
-    }
-    
-    .form-row {
-        grid-template-columns: 1fr;
-    }
-    
-    .modal-actions {
-        flex-direction: column;
-    }
-    
-    .cancel-btn,
-    .modal-form .submit-btn {
-        width: 100%;
-    }
 }
 
 /* New Entities */

@@ -94,6 +94,18 @@ get_reminders_for_session_query = text("""
     WHERE session_id = :session_id
 """)
 
+find_user_reminder_query = text("""
+    SELECT reminder_id
+    FROM Reminder
+    WHERE session_id = :session_id AND user_id = :user_id
+    LIMIT 1
+""")
+
+delete_user_reminder_query = text("""
+    DELETE FROM Reminder
+    WHERE session_id = :session_id AND user_id = :user_id
+""")
+
 fetch_all_courses_query = text("""
     SELECT 
         course_offering_id AS id,
@@ -325,6 +337,27 @@ fetch_resource_by_id_query = text("""
 insert_reminder_query = text("""
     INSERT INTO Reminder (session_id, user_id, reminder_time, reminder_sent)
     VALUES (:session_id, :user_id, :reminder_time, 0)
+""")
+
+due_reminders_query = text("""
+    SELECT 
+        r.reminder_id,
+        r.session_id,
+        r.user_id,
+        r.reminder_time,
+        s.start_time,
+        s.description,
+        u.email
+    FROM Reminder r
+    JOIN StudySession s ON s.session_id = r.session_id
+    JOIN User u ON u.user_id = r.user_id
+    WHERE r.reminder_sent = 0 AND r.reminder_time <= NOW()
+""")
+
+mark_reminder_sent_query = text("""
+    UPDATE Reminder
+    SET reminder_sent = 1
+    WHERE reminder_id = :reminder_id
 """)
 
 insert_session_tag_query = text("""

@@ -1,4 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+import os
+import smtplib
+from email.mime.text import MIMEText
 
 from flask import render_template, request, redirect, url_for, flash, jsonify, abort, current_app, Response
 from flask_login import (
@@ -14,6 +17,20 @@ import sql_queries as queries
 
 
 def register_routes(app, db):
+
+    def send_email(to_address, subject, body):
+        gmail_user = os.getenv("GMAIL_USER") or os.getenv("GMAIL_USERNAME")
+        gmail_pass = os.getenv("GMAIL_PASS") or os.getenv("GMAIL_PASSWORD")
+        if not gmail_user or not gmail_pass:
+            return False
+        msg = MIMEText(body)
+        msg["Subject"] = subject
+        msg["From"] = gmail_user
+        msg["To"] = to_address
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(gmail_user, gmail_pass)
+            server.sendmail(gmail_user, [to_address], msg.as_string())
+        return True
 
     def find_course(course_id):
         if not course_id:
@@ -110,6 +127,15 @@ def register_routes(app, db):
             reminder_copy['display_time'] = format_datetime_string(reminder_copy.get('reminder_time'))
             reminders.append(reminder_copy)
         return reminders
+
+    def user_has_reminder(session_id, user_id):
+        if not user_id:
+            return False
+        row = db.session.execute(
+            queries.find_user_reminder_query,
+            {"session_id": session_id, "user_id": user_id},
+        ).first()
+        return bool(row)
 
     def allowed_resource(filename):
         if not filename or "." not in filename:
@@ -547,6 +573,7 @@ def register_routes(app, db):
         
         # Build context for course and location details
         context = build_session_context(session_dict)
+        reminder_opted_in = user_has_reminder(session_id, current_user.user_id)
 
         return render_template(
             "session.html",
@@ -555,7 +582,49 @@ def register_routes(app, db):
             location=context['location'],
             attendees=context['attendees'],
             isOrganizer=checkOrganizer,
+            user_has_reminder=reminder_opted_in,
         )
+
+    @app.route("/sessions/<int:session_id>/reminder", methods=["POST"])
+    @login_required
+    def toggle_reminder(session_id):
+        action = request.form.get("action", "add")
+        existing = db.session.execute(
+            queries.find_user_reminder_query,
+            {"session_id": session_id, "user_id": current_user.user_id},
+        ).first()
+        if action == "remove":
+            db.session.execute(
+                queries.delete_user_reminder_query,
+                {"session_id": session_id, "user_id": current_user.user_id},
+            )
+            db.session.commit()
+            flash("Reminder removed.", "info")
+            return redirect(url_for("view_session", session_id=session_id))
+
+        if existing:
+            flash("Reminder already set.", "info")
+            return redirect(url_for("view_session", session_id=session_id))
+
+        session_row = db.session.execute(
+            queries.view_session_query, {"session_id": session_id}
+        ).first()
+        if not session_row or not session_row.start_time:
+            flash("Cannot set a reminder without a start time.", "error")
+            return redirect(url_for("view_session", session_id=session_id))
+
+        reminder_time = session_row.start_time - timedelta(hours=2)
+        db.session.execute(
+            queries.insert_reminder_query,
+            {
+                "session_id": session_id,
+                "user_id": current_user.user_id,
+                "reminder_time": reminder_time,
+            },
+        )
+        db.session.commit()
+        flash("Reminder set for 2 hours before start.", "success")
+        return redirect(url_for("view_session", session_id=session_id))
 
     @app.route("/sessions/<int:session_id>/resources", methods=['POST'])
     @login_required
@@ -592,6 +661,24 @@ def register_routes(app, db):
 
         flash('Resource uploaded.', 'success')
         return redirect(url_for('view_session', session_id=session_id))
+
+    @app.route("/tasks/send_due_reminders")
+    def send_due_reminders():
+        rows = db.session.execute(queries.due_reminders_query).fetchall()
+        sent = 0
+        for row in rows:
+            start_display = row.start_time.strftime("%b %d, %I:%M %p") if row.start_time else "soon"
+            subject = "Study session reminder"
+            body = f"Your study session is starting at {start_display}.\n\nDetails: {row.description or 'Study session'}"
+            ok = send_email(row.email, subject, body)
+            if ok:
+                db.session.execute(
+                    queries.mark_reminder_sent_query,
+                    {"reminder_id": row.reminder_id},
+                )
+                sent += 1
+        db.session.commit()
+        return jsonify({"sent": sent})
 
     @app.route("/join_session/<int:session_id>", methods=['POST'])
     @login_required
