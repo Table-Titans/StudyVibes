@@ -1,36 +1,25 @@
-{% set session_data = session|default({}) %}
-{% set course_data = course if course is defined and course else session_data.get('course') %}
-{% set location_data = location if location is defined and location else session_data.get('location') %}
+{% set session_data = session or {} %}
+{% set course_data = course or session_data.get('course') %}
 {% set chill_map = {1: "😎", 2: "🤓", 3: "😤", "1": "😎", "2": "🤓", "3": "😤"} %}
 {% set chill_display = chill_map.get(session_data.get('chill_level'), session_data.get('chill_level')) %}
-
-{% if attendees is defined %}
-    {% set attendee_data = attendees %}
-{% elif session_data.get('attendee_list') is not none %}
-    {% set attendee_data = session_data.get('attendee_list') %}
-{% else %}
-    {% set attendee_data = session_data.get('attendees') %}
-{% endif %}
-
-{% set description_text = session_data.get('description') or (description if description is defined else None) %}
-{% set notes_text = session_data.get('notes') or (notes if notes is defined else None) %}
-{% set organizer_name = session_data.get('organizer')%}
-{% set start_value = session_data.get('start_time') or (start_time if start_time is defined else None) %}
-{% set end_value = session_data.get('end_time') or (end_time if end_time is defined else None) %}
-
-{% set course_title = course_data.title if course_data and course_data.title is defined and course_data.title else session_data.get('course_name') %}
-{% set course_section = course_data.section if course_data and course_data.section is defined and course_data.section else (session_data.get('section') or session_data.get('course_section')) %}
-{% set course_year = course_data.year if course_data and course_data.year is defined and course_data.year is not none else (session_data.get('year') if session_data.get('year') is not none else session_data.get('course_year')) %}
-{% set course_term = course_data.term if course_data and course_data.term is defined and course_data.term is not none else (session_data.get('term') if session_data.get('term') is not none else session_data.get('course_term')) %}
-{% set professor_name = course_data.professor_name if course_data and course_data.professor_name is defined and course_data.professor_name else session_data.get('professor_name') %}
-
+{% set attendee_data = attendees or session_data.get('attendee_list') or session_data.get('attendees') %}
+{% set description_text = session_data.get('description') or description %}
+{% set notes_text = session_data.get('notes') or notes %}
+{% set organizer_name = session_data.get('organizer') %}
+{% set start_value = session_data.get('start_time') or start_time %}
+{% set end_value = session_data.get('end_time') or end_time %}
+{% set course_title = course_data.title if course_data else session_data.get('course_name') %}
+{% set course_section = course_data.section if course_data else session_data.get('course_section') %}
+{% set course_year = course_data.year if course_data else session_data.get('course_year') %}
+{% set course_term = course_data.term if course_data else session_data.get('course_term') %}
+{% set professor_name = course_data.professor_name if course_data else session_data.get('professor_name') %}
 {% set term_lookup = {1: "Fall", 2: "Spring", 3: "Summer", 4: "Winter"} %}
-{% set display_title = session_data.get('title') or (course_title if course_title else "Study Session Details") %}
+{% set display_title = session_data.get('title') or course_title or "Study Session Details" %}
 {% set room_type_info = session_data.get('room_type') %}
 {% set session_tags = session_data.get('tags') or [] %}
 {% set session_resources = session_data.get('resources') or [] %}
 {% set session_reminders = session_data.get('reminders') or [] %}
-{% set is_organizer = session_data.get('organizer', '') is string and 'you' in session_data.get('organizer', '').lower() %}
+{% set location_label = session_data.get('location') or (location.address ~ " - Room " ~ location.room_number if location else "") or session_data.get('location_name') or session_data.get('address') %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -38,56 +27,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ display_title }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     {% include "partials/navbar.html" %}
-
-    {% set location_info = location_data %}
-    {% set location_ns = namespace(label="", map_query="") %}
-
-    {% if location_info %}
-        {% if location_info is string %}
-            {% set location_ns.label = location_info %}
-            {% set location_ns.map_query = location_info %}
-        {% elif location_info is mapping %}
-            {% set address = location_info.get('address') %}
-            {% set room = location_info.get('room_number') %}
-            {% if address %}
-                {% set location_ns.label = address %}
-                {% set location_ns.map_query = address %}
-            {% endif %}
-            {% if room %}
-                {% set location_ns.label = (location_ns.label ~ " - Room " ~ room) if location_ns.label else room %}
-                {% set location_ns.map_query = (location_ns.map_query ~ " " ~ room) if location_ns.map_query else room %}
-            {% endif %}
-        {% endif %}
-    {% endif %}
-
-    {% if not location_ns.label %}
-        {% set address = session_data.get('address') %}
-        {% set room = session_data.get('room_number') %}
-        {% if address %}
-            {% set location_ns.label = address %}
-            {% set location_ns.map_query = address %}
-        {% endif %}
-        {% if room %}
-            {% set location_ns.label = (location_ns.label ~ " - Room " ~ room) if location_ns.label else room %}
-            {% set location_ns.map_query = (location_ns.map_query ~ " " ~ room) if location_ns.map_query else room %}
-        {% endif %}
-    {% endif %}
-
-    {% if not location_ns.label and session_data.get('location_name') %}
-        {% set location_ns.label = session_data.get('location_name') %}
-        {% set location_ns.map_query = session_data.get('location_name') %}
-    {% endif %}
-
-    {% if not location_ns.label and session_data.get('location') %}
-        {% set location_ns.label = session_data.get('location') %}
-        {% set location_ns.map_query = session_data.get('location') %}
-    {% endif %}
     <div class="form-container session-details">
-        <div class="session-header-nav">
+            <div class="session-header-nav">
             <a href="{{ url_for('home') }}" class="back-btn">← Back to dashboard</a>
             {% if isOrganizer %}
             <div class="session-organizer-actions">
@@ -131,7 +77,7 @@
             </div>
             <div class="summary-card">
                 <span class="summary-label">Location</span>
-                <span class="summary-value">{{ location_ns.label or "Location coming soon" }}</span>
+                <span class="summary-value">{{ location_label or "Location coming soon" }}</span>
             </div>
             <div class="summary-card">
                 <span class="summary-label">Room Type</span>
@@ -269,9 +215,9 @@
 
             <div class="session-card map-card">
                 <h2 class="session-section-title">Where to Meet</h2>
-                {% if location_ns.map_query %}
+                {% if location_label %}
                     <iframe class="map-frame" loading="lazy" allowfullscreen
-                        src="https://www.google.com/maps?q={{ location_ns.map_query | urlencode }}&amp;output=embed"></iframe>
+                        src="https://www.google.com/maps?q={{ location_label | urlencode }}&amp;output=embed"></iframe>
                 {% else %}
                     <div class="map-placeholder">Map preview will appear here once the location is finalized.</div>
                 {% endif %}
@@ -280,36 +226,11 @@
             <div class="session-card attendees-card">
                 <h2 class="session-section-title">Attendees</h2>
                 {% if attendee_data %}
-                    {% if attendee_data is number %}
-                        <p>{{ attendee_data }} attendee{{ '' if attendee_data == 1 else 's' }} currently registered.</p>
-                    {% elif attendee_data is string %}
-                        <p>{{ attendee_data }}</p>
-                    {% elif attendee_data is mapping %}
-                        <div class="notes-highlight">
-                            {% for key, value in attendee_data.items() %}
-                                <p><strong>{{ key }}:</strong> {{ value }}</p>
-                            {% endfor %}
-                        </div>
-                    {% elif attendee_data is iterable %}
-                        <ul class="attendee-list">
-                            {% for attendee in attendee_data %}
-                                {% if attendee is mapping %}
-                                    {% set attendee_name = attendee.name if attendee.name is defined and attendee.name else (attendee.get('name') if attendee.get is defined else '') %}
-                                    {% set attendee_role = attendee.role if attendee.role is defined and attendee.role else (attendee.get('role') if attendee.get is defined else '') %}
-                                    <li>
-                                        {{ attendee_name or "Attendee" }}
-                                        {% if attendee_role %}
-                                             {{ attendee_role }}
-                                        {% endif %}
-                                    </li>
-                                {% else %}
-                                    <li>{{ attendee }}</li>
-                                {% endif %}
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p>No attendees listed yet.</p>
-                    {% endif %}
+                    <ul class="attendee-list">
+                        {% for attendee in attendee_data %}
+                            <li>{{ attendee }}</li>
+                        {% endfor %}
+                    </ul>
                 {% else %}
                     <p>No attendees have joined this session yet.</p>
                 {% endif %}

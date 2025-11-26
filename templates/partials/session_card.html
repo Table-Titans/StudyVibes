@@ -1,41 +1,67 @@
-{% set course = courses|selectattr("id", "equalto", session.course_id)|first if session.course_id else None %}
-{% set location = locations|selectattr("id", "equalto", session.location_id)|first if session.location_id else None %}
-{% set tag_ids = session.tag_ids if session.tag_ids is defined and session.tag_ids is not none else [] %}
-{% set tag_ns = namespace(items=[]) %}
-{% if tags is defined and tag_ids %}
-    {% for tag in tags %}
-        {% if tag.id in tag_ids %}
-            {% set tag_ns.items = tag_ns.items + [tag.tag_name] %}
-        {% endif %}
-    {% endfor %}
+<!-- Find the matching course to display -->
+{% set course = None %}
+{% for c in courses %}
+  {% if c.id == session.course_id %}
+    {% set course = c %}
+  {% endif %}
+{% endfor %}
+
+<!-- Find the matching location to display -->
+{% set location = None %}
+{% for loc in locations %}
+  {% if loc.id == session.location_id %}
+    {% set location = loc %}
+  {% endif %}
+{% endfor %}
+
+<!-- Find the matching tags to display -->
+{% set tag_ids = session.tag_ids or [] %}
+{% set tag_names = [] %}
+{% for t in tags %}
+  {% if t.id in tag_ids %}
+    {% set tag_names = tag_names + [t.tag_name] %}
+  {% endif %}
+{% endfor %}
+
+<!-- Set intensity for session_card background color css class -->
+{% set intensity = "" %}
+{% if session.chill_level == 1 or session.chill_level == "1" %}
+  {% set intensity = "chill" %}
+{% elif session.chill_level == 2 or session.chill_level == "2" %}
+  {% set intensity = "moderate" %}
+{% elif session.chill_level == 3 or session.chill_level == "3" %}
+  {% set intensity = "intense" %}
 {% endif %}
+
+<!-- Set emoji to display based off of chill level -->
 {% set chill_map = {1: "😎", 2: "🤓", 3: "😤", "1": "😎", "2": "🤓", "3": "😤"} %}
 {% set chill_display = chill_map.get(session.chill_level, session.chill_level) %}
-<div class="session_card {{ 'chill' if session.chill_level == 1 else 'moderate' if session.chill_level == 2 else 'intense' if session.chill_level == 3 else '' }}" 
+
+
+
+<div class="session_card {{ intensity }}" 
      data-session-id="{{ session.id }}"
      data-course-id="{{ session.course_id if session.course_id else '' }}"
      data-location-id="{{ session.location_id if session.location_id else '' }}"
-     data-course-name="{{ course.title if course else '' }}"
-     data-location-address="{{ location.address if location else '' }}"
-     data-course-year="{{ course.year if course else '' }}"
-     data-course-term="{{ course.term if course else '' }}"
-     data-professor-name="{{ course.professor_name if course else '' }}"
-     data-tags="{{ tag_ns.items|join(',') }}">
+     data-course-name="{{ (course.title if course else session.title) or '' }}"
+     data-location-address="{{ (location.address if location else session.location) or '' }}"
+     data-course-year="{{ course.year if course else (session.year or '') }}"
+     data-course-term="{{ course.term if course else (session.term or '') }}"
+     data-professor-name="{{ course.professor_name if course else (session.professor_name or '') }}"
+     data-tags="{{ tag_names|join(',') }}">
     <a class="session-card-link" href="{{ url_for('view_session', session_id=session.id) }}">
         <div class="session_info">
-            {% if chill_display %}
-                <div class="session-chill-emoji" aria-label="Chill level">
-                    {{ chill_display }}
-                </div>
-            {% endif %}
+            <div class="session-chill-emoji" aria-label="Chill level">
+                {{ chill_display }}
+            </div>
             <div class="session-text">
                 <h1>{{ session.title }}</h1>
                 <p class="session-meta-line location">Location: <span>{{ session.location }}</span></p>
                 <p class="session-meta-line time">Time: <span>{{ session.time }}</span></p>
                 <p class="session-meta-line attendees">Attendees: <span>{{ session.attendees }}</span></p>
-                {% if tag_ns.items %}
+                {% if tag_names %}
                     <div class="session-tags">
-                        {% for tag_name in tag_ns.items %}
+                        {% for tag_name in tag_names %}
                             <span class="tag-pill">{{ tag_name|title }}</span>
                         {% endfor %}
                     </div>

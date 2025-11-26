@@ -1,27 +1,31 @@
 document.addEventListener('DOMContentLoaded', function() {
+
+    // Create Join and Leave button variables by css class
     const joinButtons = document.querySelectorAll('.join-session');
     const leaveButtons = document.querySelectorAll('.leave-session');
 
+    // Add an event lister to each join session button
     joinButtons.forEach(button => {
+
+        // When clicked, disable the button and send a POST request to join the session
         button.addEventListener('click', function() {
             const sessionId = this.getAttribute('data-session-id');
             this.disabled = true;
             fetch(`/join_session/${sessionId}`, {
                 method: 'POST',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json'
-                }
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
-                .then(response => response.json())
-                .then(data => {
-                    this.disabled = false;
-                    if (data.success) {
-                        window.location.reload();
-                    } else {
-                        alert(data.message || 'Failed to join session.');
+                // Reload the page on success
+                .then(response => {
+                    if (!response.ok) {
+                        this.disabled = false;
+                        alert('You already joined this session.');
+                        return;
                     }
+                    window.location.reload();
                 })
+
+                // Re-enable the button and show an error on failure
                 .catch(error => {
                     this.disabled = false;
                     console.error('Error:', error);
@@ -30,30 +34,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Add an event lister to each leave session button
     leaveButtons.forEach(button => {
+
+        // When clicked, disable the button and send a POST request to leave the session
         button.addEventListener('click', function() {
+
+            // Show confirmation window to make sure the user isn't leaving the session by accident
             if (!confirm('Are you sure you want to leave this session?')) {
-                return;
+                return window.location.reload();
             }
             const sessionId = this.getAttribute('data-session-id');
             this.disabled = true;
             fetch(`/leave_session/${sessionId}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json'
-                }
             })
-                .then(response => response.json())
-                .then(data => {
-                    this.disabled = false;
-                    if (data.success) {
-                        window.location.reload();
-                    } else {
-                        alert(data.message || 'Failed to leave session.');
-                    }
-                })
+                // Reload the page on success
+                .then(() => window.location.reload())
+
+                // Re-enable the button and show an error on failure
                 .catch(error => {
                     this.disabled = false;
                     console.error('Error:', error);
@@ -62,15 +61,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Add an event lister to each delete session button
     const deleteButtons = document.querySelectorAll('.delete-session');
     deleteButtons.forEach(button => {
+
+        // When clicked, disable the button and send a POST request to delete the session
         button.addEventListener('click', function() {
+            // Show confirmation window to make sure the user isn't deleting the session by accident
             if (!confirm('Are you sure you want to delete this session? All attendance records will be removed.')) {
                 return;
             }
             const sessionId = this.getAttribute('data-session-id');
             this.disabled = true;
 
+            // Create and submit a temporary form to delete the session
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = `/sessions/${sessionId}/delete`;
@@ -79,10 +83,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Filter Panel Toggle
+    // Filter Panel and Toggle variables by css class
     const filterToggle = document.getElementById('filterToggle');
     const filterPanel = document.getElementById('filterPanel');
     
+    // REFINE AND SIMPLIFY FILTERING LOGIC
     if (filterToggle && filterPanel) {
         filterToggle.addEventListener('click', function() {
             filterPanel.classList.toggle('active');
@@ -90,12 +95,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Filter Functionality
+    // Create Join and Leave button variables by css class
     const applyFiltersBtn = document.getElementById('applyFilters');
     const clearFiltersBtn = document.getElementById('clearFilters');
     const searchBar = document.getElementById('searchBar');
     const filterTag = document.getElementById('filterTag');
     
+    // Apply filters when called
     function applyFilters() {
         const courseFilter = document.getElementById('filterCourse').value.toLowerCase();
         const locationFilter = document.getElementById('filterLocation').value.toLowerCase();
@@ -109,17 +115,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const noResultsMessage = document.getElementById('noResultsMessage');
         let visibleCount = 0;
         
+        // Assign session card attributes for filtering
         sessionCards.forEach(card => {
-            const courseName = card.getAttribute('data-course-name').toLowerCase();
-            const locationAddress = card.getAttribute('data-location-address').toLowerCase();
-            const courseYear = card.getAttribute('data-course-year');
-            const courseTerm = card.getAttribute('data-course-term');
-            const professorName = card.getAttribute('data-professor-name').toLowerCase();
+            const courseName = (card.getAttribute('data-course-name') || '').toLowerCase();
+            const locationAddress = (card.getAttribute('data-location-address') || '').toLowerCase();
+            const courseYear = card.getAttribute('data-course-year') || '';
+            const courseTerm = card.getAttribute('data-course-term') || '';
+            const professorName = (card.getAttribute('data-professor-name') || '').toLowerCase();
             const cardTagsValue = card.getAttribute('data-tags') || '';
             const cardTags = cardTagsValue ? cardTagsValue.toLowerCase().split(',') : [];
             const cardText = card.textContent.toLowerCase();
             
-            // Check if card matches all filters
+            // Check if card matches all the filters
             const matchesCourse = !courseFilter || courseName.includes(courseFilter);
             const matchesLocation = !locationFilter || locationAddress.includes(locationFilter);
             const matchesYear = !yearFilter || courseYear === yearFilter;
@@ -128,6 +135,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const matchesTag = !tagFilter || cardTags.includes(tagFilter);
             const matchesSearch = !searchQuery || cardText.includes(searchQuery);
             
+            // If all of the filters match, display the card; otherwise, hide it
             if (matchesCourse && matchesLocation && matchesYear && matchesTerm && matchesProfessor && matchesTag && matchesSearch) {
                 card.style.display = 'flex';
                 visibleCount++;
@@ -135,13 +143,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 card.style.display = 'none';
             }
         });
-        
-        // Show/hide no results message
+
         if (noResultsMessage) {
             noResultsMessage.style.display = visibleCount === 0 ? 'block' : 'none';
         }
     }
     
+    // Clear the filters when called
     function clearFilters() {
         document.getElementById('filterCourse').value = '';
         document.getElementById('filterLocation').value = '';
@@ -153,12 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         applyFilters();
     }
-    
-    // Event listeners for filter controls
-    if (applyFiltersBtn) {
-        applyFiltersBtn.addEventListener('click', applyFilters);
-    }
-    
+    // Clear filters button
     if (clearFiltersBtn) {
         clearFiltersBtn.addEventListener('click', clearFilters);
     }
