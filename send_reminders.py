@@ -5,7 +5,6 @@ from email.mime.text import MIMEText
 
 from __init__ import create_app, db
 import sql_queries as queries
-from routes import format_datetime_string
 
 
 def send_email(to_address, subject, body):
@@ -28,9 +27,10 @@ def main():
     with app.app_context():
         while True:
             rows = db.session.execute(queries.due_reminders_query).fetchall()
-            sent = 0
             for row in rows:
-                start_display = format_datetime_string(row.start_time) or "soon"
+                start_display = (
+                    row.start_time.strftime("%b %d, %I:%M %p") if row.start_time else "soon"
+                )
                 subject = "Study session reminder"
                 body = f"Your study session is starting at {start_display}.\n\nDetails: {row.description or 'Study session'}"
                 if send_email(row.email, subject, body):
@@ -38,10 +38,8 @@ def main():
                         queries.mark_reminder_sent_query,
                         {"reminder_id": row.reminder_id},
                     )
-                    sent += 1
             db.session.commit()
-            print(f"Reminders processed: {len(rows)}, sent: {sent}")
-            time.sleep(60)
+            time.sleep(300)
 
 
 if __name__ == "__main__":
