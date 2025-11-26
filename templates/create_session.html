@@ -4,44 +4,66 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Create Study Session</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     {% include "partials/navbar.html" %}
-    
     <div class="form-container">
         <h1>Create a Study Session</h1>
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="flash-messages">
-                    {% for category, message in messages %}
-                        <li class="flash {{ category }}">{{ message }}</li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
+            <ul class="flash-messages">
+                {% for category, message in messages %}
+                    <li class="flash {{ category }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
         {% endwith %}
         <form method="POST" action="{{ url_for('create_session') }}" class="create-session-form" enctype="multipart/form-data">
-            <div class="form-group">
-                <label for="course">Course</label>
-                <div class="autocomplete-wrapper">
-                    <input type="text" id="course" name="course" required autocomplete="off" placeholder="Search for a course...">
-                    <input type="hidden" id="course_id" name="course_id">
-                    <div class="autocomplete-list" id="course-suggestions"></div>
+            <div class="form-group mb-3">
+                <label for="course" class="form-label">Course</label>
+                <input class="form-control" list="course-list" id="course" name="course" required autocomplete="off" placeholder="Start typing a course..." />
+                <input type="hidden" id="course_id" name="course_id">
+                <datalist id="course-list">
+                    {% for course in courses %}
+                        <option data-id="{{ course.id }}" value="{{ course.title }} - Section {{ course.section }} ({{ course.professor_name }})"></option>
+                    {% endfor %}
+                </datalist>
+                <button type="button" class="link-button" id="showCourseForm">Can't find it? Add course</button>
+                <div id="inlineCourseForm" class="inline-create hidden">
+                    <input class="form-control" type="text" id="new_course_title" placeholder="Course title">
+                    <input class="form-control" type="text" id="new_course_section" placeholder="Section">
+                    <input class="form-control" type="number" id="new_course_year" placeholder="Year" min="2020" max="2100">
+                    <select class="form-select" id="new_course_term">
+                        <option value="">Term</option>
+                        <option value="1">Fall</option>
+                        <option value="2">Spring</option>
+                        <option value="3">Summer</option>
+                    </select>
+                    <input class="form-control" type="text" id="new_course_prof" placeholder="Professor">
+                    <button type="button" class="btn btn-primary" id="saveCourse">Save Course</button>
                 </div>
             </div>
 
-            <div class="form-group">
-                <label for="location">Location</label>
-                <div class="autocomplete-wrapper">
-                    <input type="text" id="location" name="location" required autocomplete="off" placeholder="Search for a location...">
-                    <input type="hidden" id="location_id" name="location_id">
-                    <div class="autocomplete-list" id="location-suggestions"></div>
+            <div class="form-group mb-3">
+                <label for="location" class="form-label">Location</label>
+                <input class="form-control" list="location-list" id="location" name="location" required autocomplete="off" placeholder="Start typing a location..." />
+                <input type="hidden" id="location_id" name="location_id">
+                <datalist id="location-list">
+                    {% for location in locations %}
+                        <option data-id="{{ location.id }}" value="{{ location.address }} - Room {{ location.room_number }}"></option>
+                    {% endfor %}
+                </datalist>
+                <button type="button" class="link-button" id="showLocationForm">Can't find it? Add location</button>
+                <div id="inlineLocationForm" class="inline-create hidden">
+                    <input class="form-control" type="text" id="new_location_address" placeholder="Address">
+                    <input class="form-control" type="text" id="new_location_room" placeholder="Room">
+                    <button type="button" class="btn btn-primary" id="saveLocation">Save Location</button>
                 </div>
             </div>
 
-            <div class="form-group">
-                <label for="room_type_id">Room Type</label>
-                <select id="room_type_id" name="room_type_id" required>
+            <div class="form-group mb-3">
+                <label for="room_type_id" class="form-label">Room Type</label>
+                <select class="form-select" id="room_type_id" name="room_type_id" required>
                     <option value="">Select a room type...</option>
                     {% for room in room_types %}
                         <option value="{{ room.id }}">{{ room.type_name }}</option>
@@ -50,37 +72,37 @@
                 <small>Pick where the session takes place so others know what to expect.</small>
             </div>
 
-            <div class="form-group">
-                <label for="max_attendees">Maximum Attendees</label>
-                <input type="number" id="max_attendees" name="max_attendees" min="1" required>
+            <div class="form-group mb-3">
+                <label for="max_attendees" class="form-label">Maximum Attendees</label>
+                <input class="form-control" type="number" id="max_attendees" name="max_attendees" min="1" required>
             </div>
 
-            <div class="form-group">
-                <label for="description">Session Description</label>
-                <textarea id="description" name="description" maxlength="200" rows="4" required></textarea>
+            <div class="form-group mb-3">
+                <label for="description" class="form-label">Session Description</label>
+                <textarea class="form-control" id="description" name="description" maxlength="200" rows="4" required></textarea>
                 <small class="char-count">Maximum 200 characters</small>
             </div>
 
-            <div class="form-group">
-                <label for="start_time">Start Time</label>
-                <input type="datetime-local" id="start_time" name="start_time" required>
+            <div class="form-group mb-3">
+                <label for="start_time" class="form-label">Start Time</label>
+                <input class="form-control" type="datetime-local" id="start_time" name="start_time" required>
             </div>
 
-            <div class="form-group">
-                <label for="end_time">End Time</label>
-                <input type="datetime-local" id="end_time" name="end_time" required>
+            <div class="form-group mb-3">
+                <label for="end_time" class="form-label">End Time</label>
+                <input class="form-control" type="datetime-local" id="end_time" name="end_time" required>
             </div>
 
-            <div class="form-group">
-                <label for="chill_level">Session Intensity</label>
-                <select id="chill_level" name="chill_level" required>
+            <div class="form-group mb-3">
+                <label for="chill_level" class="form-label">Session Intensity</label>
+                <select class="form-select" id="chill_level" name="chill_level" required>
                     <option value="1">😎 Relaxed</option>
                     <option value="2">🤓 Focused</option>
                     <option value="3">😤 Intense</option>
                 </select>
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-3">
                 <label>Tags</label>
                 <div class="tag-options">
                     {% for tag in tags %}
@@ -93,15 +115,9 @@
                 <small>Tags help classmates filter sessions (optional).</small>
             </div>
 
-            <div class="form-group">
-                <label for="reminder_time">Email Reminder</label>
-                <input type="datetime-local" id="reminder_time" name="reminder_time">
-                <small>Pick a time to send a simple reminder email. Leave blank to skip.</small>
-            </div>
-
-            <div class="form-group">
-                <label for="resource_file">Upload Resource</label>
-                <input type="file" id="resource_file" name="resource_file" accept=".txt,.pdf,.png,.jpg,.jpeg">
+            <div class="form-group mb-4">
+                <label for="resource_file" class="form-label">Upload Resource</label>
+                <input class="form-control" type="file" id="resource_file" name="resource_file" accept=".txt,.pdf,.png,.jpg,.jpeg">
                 <small>Upload a txt, pdf, png, or jpg file. It will be saved in the database.</small>
             </div>
 
@@ -110,73 +126,6 @@
                 <button type="submit" class="submit-btn">Create Session</button>
             </div>
         </form>
-    </div>
-
-    <!-- Modal for creating new location -->
-    <div id="locationModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Create New Location</h2>
-                <span class="close" data-modal="locationModal">&times;</span>
-            </div>
-            <form id="newLocationForm" class="modal-form">
-                <div class="form-group">
-                    <label for="new_address">Address *</label>
-                    <input type="text" id="new_address" name="address" maxlength="100" required>
-                </div>
-                <div class="form-group">
-                    <label for="new_room_number">Room Number *</label>
-                    <input type="text" id="new_room_number" name="room_number" maxlength="20" required>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="cancel-btn" data-modal="locationModal">Cancel</button>
-                    <button type="submit" class="submit-btn">Create Location</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal for creating new course offering -->
-    <div id="courseModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Create New Course Offering</h2>
-                <span class="close" data-modal="courseModal">&times;</span>
-            </div>
-            <form id="newCourseForm" class="modal-form">
-                <div class="form-group">
-                    <label for="new_title">Course Title *</label>
-                    <input type="text" id="new_title" name="title" maxlength="100" required>
-                </div>
-                <div class="form-group">
-                    <label for="new_section">Section *</label>
-                    <input type="text" id="new_section" name="section" maxlength="20" required>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="new_year">Year *</label>
-                        <input type="number" id="new_year" name="year" min="2020" max="2100" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="new_term">Term *</label>
-                        <select id="new_term" name="term" required>
-                            <option value="">Select term</option>
-                            <option value="1">Fall</option>
-                            <option value="2">Spring</option>
-                            <option value="3">Summer</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="new_professor_name">Professor Name *</label>
-                    <input type="text" id="new_professor_name" name="professor_name" maxlength="50" required>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="cancel-btn" data-modal="courseModal">Cancel</button>
-                    <button type="submit" class="submit-btn">Create Course</button>
-                </div>
-            </form>
-        </div>
     </div>
 
     <script>
@@ -199,189 +148,110 @@
                 e.preventDefault();
                 alert('End time must be after start time');
             }
-        });
 
-        // Modal functionality
-        function openModal(modalId) {
-            document.getElementById(modalId).style.display = 'block';
-        }
-
-        function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
-        }
-
-        // Close modal when clicking X or Cancel
-        document.querySelectorAll('.close, .cancel-btn').forEach(element => {
-            element.addEventListener('click', function() {
-                const modalId = this.getAttribute('data-modal');
-                closeModal(modalId);
-            });
-        });
-
-        // Close modal when clicking outside
-        window.addEventListener('click', function(e) {
-            if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
+            if (!document.getElementById('course_id').value || !document.getElementById('location_id').value) {
+                e.preventDefault();
+                alert('Please pick a course and location from the list.');
             }
         });
 
-        // Autocomplete functionality with "Create New" option
-        function setupAutocomplete(inputId, hiddenIdField, suggestionsId, apiEndpoint, createModalId, formatDisplay) {
-            const input = document.getElementById(inputId);
-            const hiddenId = document.getElementById(hiddenIdField);
-            const suggestionsList = document.getElementById(suggestionsId);
-            
-            input.addEventListener('input', async function() {
-                const query = this.value.trim();
-                hiddenId.value = ''; // Clear hidden ID when user types
-                
-                if (query.length < 1) {
-                    suggestionsList.innerHTML = '';
+        // Bind datalist selection to hidden ID fields
+        function bindDatalist(inputId, hiddenId, optionSelector) {
+            const inputElement = document.getElementById(inputId);
+            const hiddenElement = document.getElementById(hiddenId);
+            if (!inputElement || !hiddenElement) return;
+            inputElement.addEventListener('input', function() {
+                hiddenElement.value = '';
+                const val = this.value;
+                document.querySelectorAll(optionSelector).forEach(opt => {
+                    if (opt.value === val) {
+                        hiddenElement.value = opt.getAttribute('data-id') || '';
+                    }
+                });
+            });
+        }
+
+        bindDatalist('course', 'course_id', '#course-list option');
+        bindDatalist('location', 'location_id', '#location-list option');
+
+        // Inline add course
+        const showCourseFormBtn = document.getElementById('showCourseForm');
+        const inlineCourseForm = document.getElementById('inlineCourseForm');
+        const saveCourseBtn = document.getElementById('saveCourse');
+        if (showCourseFormBtn && inlineCourseForm) {
+            showCourseFormBtn.addEventListener('click', () => {
+                inlineCourseForm.classList.toggle('hidden');
+            });
+        }
+        if (saveCourseBtn) {
+            saveCourseBtn.addEventListener('click', async () => {
+                const title = document.getElementById('new_course_title').value.trim();
+                const section = document.getElementById('new_course_section').value.trim();
+                const year = document.getElementById('new_course_year').value || new Date().getFullYear();
+                const term = document.getElementById('new_course_term').value;
+                const professor_name = document.getElementById('new_course_prof').value.trim();
+                if (!title || !section || !term || !professor_name) {
+                    alert('Fill in title, section, term, and professor.');
                     return;
                 }
-
                 try {
-                    const response = await fetch(`${apiEndpoint}?q=${encodeURIComponent(query)}`);
-                    const items = await response.json();
-                    
-                    suggestionsList.innerHTML = '';
-                    
-                    // Add "Create New" option at the top
-                    const createNewDiv = document.createElement('div');
-                    createNewDiv.className = 'autocomplete-item create-new';
-                    createNewDiv.innerHTML = '➕ <strong>Create New</strong>';
-                    createNewDiv.addEventListener('click', () => {
-                        openModal(createModalId);
-                        suggestionsList.innerHTML = '';
+                    const resp = await fetch('/api/courses', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title, section, year, term, professor_name })
                     });
-                    suggestionsList.appendChild(createNewDiv);
-                    
-                    // Add existing items
-                    items.forEach(item => {
-                        const div = document.createElement('div');
-                        div.className = 'autocomplete-item';
-                        div.textContent = formatDisplay(item);
-                        div.addEventListener('click', () => {
-                            input.value = formatDisplay(item);
-                            hiddenId.value = item.id;
-                            suggestionsList.innerHTML = '';
-                        });
-                        suggestionsList.appendChild(div);
-                    });
-                } catch (error) {
-                    console.error('Error fetching suggestions:', error);
-                }
-            });
-
-            // Close suggestions when clicking outside
-            document.addEventListener('click', function(e) {
-                if (!input.contains(e.target) && !suggestionsList.contains(e.target)) {
-                    suggestionsList.innerHTML = '';
+                    const result = await resp.json();
+                    if (result.success) {
+                        document.getElementById('course').value = `${result.course.title} - Section ${result.course.section} (${result.course.professor_name})`;
+                        document.getElementById('course_id').value = result.course.id;
+                        inlineCourseForm.classList.add('hidden');
+                        alert('Course created.');
+                    } else {
+                        alert(result.message || 'Could not create course.');
+                    }
+                } catch (err) {
+                    alert('Error creating course.');
                 }
             });
         }
 
-        // Setup autocomplete for locations
-        setupAutocomplete(
-            'location',
-            'location_id',
-            'location-suggestions',
-            '/api/locations',
-            'locationModal',
-            (item) => `${item.address} - Room ${item.room_number}`
-        );
-
-        // Setup autocomplete for courses
-        setupAutocomplete(
-            'course',
-            'course_id',
-            'course-suggestions',
-            '/api/courses',
-            'courseModal',
-            (item) => `${item.title} - Section ${item.section} (${item.professor_name})`
-        );
-
-        // Handle new location form submission
-        document.getElementById('newLocationForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            const data = Object.fromEntries(formData);
-            
-            try {
-                const response = await fetch('/api/locations', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    // Update the location input with the new location
-                    document.getElementById('location').value = `${result.location.address} - Room ${result.location.room_number}`;
-                    document.getElementById('location_id').value = result.location.id;
-                    
-                    // Close modal and reset form
-                    closeModal('locationModal');
-                    this.reset();
-                    
-                    alert('Location created successfully!');
-                } else {
-                    alert('Error creating location: ' + result.message);
+        // Inline add location
+        const showLocationFormBtn = document.getElementById('showLocationForm');
+        const inlineLocationForm = document.getElementById('inlineLocationForm');
+        const saveLocationBtn = document.getElementById('saveLocation');
+        if (showLocationFormBtn && inlineLocationForm) {
+            showLocationFormBtn.addEventListener('click', () => {
+                inlineLocationForm.classList.toggle('hidden');
+            });
+        }
+        if (saveLocationBtn) {
+            saveLocationBtn.addEventListener('click', async () => {
+                const address = document.getElementById('new_location_address').value.trim();
+                const room_number = document.getElementById('new_location_room').value.trim();
+                if (!address || !room_number) {
+                    alert('Fill in address and room.');
+                    return;
                 }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('An error occurred while creating the location.');
-            }
-        });
-
-        // Handle new course form submission
-        document.getElementById('newCourseForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            const data = Object.fromEntries(formData);
-            
-            // Set default year to current year if not set
-            if (!data.year) {
-                data.year = new Date().getFullYear();
-            }
-            
-            try {
-                const response = await fetch('/api/courses', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    // Update the course input with the new course
-                    document.getElementById('course').value = `${result.course.title} - Section ${result.course.section} (${result.course.professor_name})`;
-                    document.getElementById('course_id').value = result.course.id;
-                    
-                    // Close modal and reset form
-                    closeModal('courseModal');
-                    this.reset();
-                    
-                    alert('Course created successfully!');
-                } else {
-                    alert('Error creating course: ' + result.message);
+                try {
+                    const resp = await fetch('/api/locations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ address, room_number })
+                    });
+                    const result = await resp.json();
+                    if (result.success) {
+                        document.getElementById('location').value = `${result.location.address} - Room ${result.location.room_number}`;
+                        document.getElementById('location_id').value = result.location.id;
+                        inlineLocationForm.classList.add('hidden');
+                        alert('Location created.');
+                    } else {
+                        alert(result.message || 'Could not create location.');
+                    }
+                } catch (err) {
+                    alert('Error creating location.');
                 }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('An error occurred while creating the course.');
-            }
-        });
-
-        // Set default year to current year
-        document.getElementById('new_year').value = new Date().getFullYear();
+            });
+        }
     </script>
 </body>
 </html>

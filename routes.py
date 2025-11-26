@@ -204,49 +204,6 @@ def register_routes(app, db):
         rows = db.session.execute(queries.fetch_all_tags_query).fetchall()
         return [dict(row._mapping) for row in rows]
 
-    def build_session_context(session_record):
-        if not session_record:
-            return None
-
-        session_copy = dict(session_record)
-        course = find_course(session_copy.get("course_id"))
-        location = find_location(session_copy.get("location_id"))
-
-        # Prefer explicit start/end times; fall back to generic time if needed
-        start_display = session_copy.get("start_time")
-        end_display = session_copy.get("end_time")
-        if start_display and "T" in start_display:
-            start_display = format_datetime_string(start_display)
-        if end_display and "T" in end_display:
-            end_display = format_datetime_string(end_display)
-
-        if not start_display:
-            start_display = session_copy.get("time") or "TBD"
-        if not end_display:
-            end_display = session_copy.get("end_time_display") or "TBD"
-
-        session_copy["start_time"] = start_display
-        session_copy["end_time"] = end_display
-
-        attendees_data = session_copy.get(
-            "attendee_list", session_copy.get("attendees")
-        )
-        room_type = find_room_type(session_copy.get("room_type_id"))
-        session_copy["room_type"] = room_type
-
-        tag_ids = session_copy.get("tag_ids") or get_session_tag_ids(session_copy["id"])
-        session_copy["tag_ids"] = tag_ids
-        session_copy["tags"] = find_tags(tag_ids)
-        session_copy["resources"] = get_resources_for_session(session_copy["id"])
-        session_copy["reminders"] = get_reminders_for_session(session_copy["id"])
-
-        return {
-            "session": session_copy,
-            "course": course,
-            "location": location,
-            "attendees": attendees_data,
-        }
-
     @app.route("/")
     @login_required
     def home():
@@ -255,6 +212,7 @@ def register_routes(app, db):
         all_sessions = []
 
         for row in rows:
+            display_time = format_datetime_string(row.start_time) or "TBD"
             session_dict = {
                 'id': row.session_id,
                 'session_id': row.session_id,
@@ -263,13 +221,13 @@ def register_routes(app, db):
                 'organizer_id': row.organizer_id,
                 'max_attendees': row.max_attendees,
                 'description': row.description,
-                'start_time': row.start_time.isoformat() if row.start_time else None,
-                'end_time': row.end_time.isoformat() if row.end_time else None,
+                'start_time': display_time,
+                'end_time': format_datetime_string(row.end_time) if row.end_time else None,
                 'chill_level': row.chill_level,
                 'room_type_id': row.room_type_id,
                 'title': row.course_title or row.description or 'Study Session',
                 'location': f"{row.location_address} - Room {row.location_room}" if row.location_address else 'TBD',
-                'time': row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else 'TBD',
+                'time': display_time,
                 'attendees': row.attendance_count,
                 'is_organizer': row.organizer_id == current_user.user_id,
             }
@@ -280,6 +238,7 @@ def register_routes(app, db):
         ).fetchall()
         my_sessions = []
         for row in rows:
+            display_time = format_datetime_string(row.start_time) or 'TBD'
             session_dict = {
                 'id': row.session_id,
                 'session_id': row.session_id,
@@ -288,13 +247,13 @@ def register_routes(app, db):
                 'organizer_id': row.organizer_id,
                 'max_attendees': row.max_attendees,
                 'description': row.description,
-                'start_time': row.start_time.isoformat() if row.start_time else None,
-                'end_time': row.end_time.isoformat() if row.end_time else None,
+                'start_time': display_time,
+                'end_time': format_datetime_string(row.end_time) if row.end_time else None,
                 'chill_level': row.chill_level,
                 'room_type_id': row.room_type_id,
                 'title': row.course_title or row.description or 'Study Session',
                 'location': f"{row.location_address} - Room {row.location_room}" if row.location_address else 'TBD',
-                'time': row.start_time.strftime('%b %d, %I:%M %p') if row.start_time else 'TBD',
+                'time': display_time,
                 'attendees': row.attendance_count,
                 'is_organizer': row.organizer_id == current_user.user_id,  # Add this line
 
@@ -414,7 +373,6 @@ def register_routes(app, db):
             end_time = request.form.get('end_time')
             chill_level = request.form.get('chill_level', type=int)
             room_type_id = request.form.get('room_type_id', type=int)
-            reminder_time = request.form.get('reminder_time')
             tag_ids = []
             for raw_tag in request.form.getlist('tags'):
                 try:
@@ -509,7 +467,14 @@ def register_routes(app, db):
             
             return redirect(url_for('view_session', session_id=new_session_id))
             
-        return render_template("create_session.html", title="Create Session", room_types=fetch_all_room_types(), tags=fetch_all_tags())
+        return render_template(
+            "create_session.html",
+            title="Create Session",
+            room_types=fetch_all_room_types(),
+            tags=fetch_all_tags(),
+            courses=fetch_all_courses(),
+            locations=fetch_all_locations(),
+        )
 
     @app.route("/sessions/<int:session_id>")
     @login_required
@@ -571,16 +536,24 @@ def register_routes(app, db):
             'reminder_ids': []
         }
         
-        # Build context for course and location details
-        context = build_session_context(session_dict)
+        session_dict["start_time"] = format_datetime_string(row.start_time) or "TBD"
+        session_dict["end_time"] = format_datetime_string(row.end_time) or "TBD"
+        session_dict["room_type"] = find_room_type(session_dict.get("room_type_id"))
+        tag_ids = get_session_tag_ids(session_id)
+        session_dict["tag_ids"] = tag_ids
+        session_dict["tags"] = find_tags(tag_ids)
+        session_dict["resources"] = get_resources_for_session(session_id)
+        session_dict["reminders"] = get_reminders_for_session(session_id)
         reminder_opted_in = user_has_reminder(session_id, current_user.user_id)
+        course = find_course(session_dict.get("course_id"))
+        location = find_location(session_dict.get("location_id"))
 
         return render_template(
             "session.html",
-            session=context['session'],
-            course=context['course'],
-            location=context['location'],
-            attendees=context['attendees'],
+            session=session_dict,
+            course=course,
+            location=location,
+            attendees=attendees_formatted,
             isOrganizer=checkOrganizer,
             user_has_reminder=reminder_opted_in,
         )
@@ -667,7 +640,7 @@ def register_routes(app, db):
         rows = db.session.execute(queries.due_reminders_query).fetchall()
         sent = 0
         for row in rows:
-            start_display = row.start_time.strftime("%b %d, %I:%M %p") if row.start_time else "soon"
+            start_display = format_datetime_string(row.start_time) or "soon"
             subject = "Study session reminder"
             body = f"Your study session is starting at {start_display}.\n\nDetails: {row.description or 'Study session'}"
             ok = send_email(row.email, subject, body)
@@ -839,7 +812,9 @@ def register_routes(app, db):
             location_display=location_display,
             room_types=fetch_all_room_types(),
             tags=fetch_all_tags(),
-            session_tag_ids=session_tag_ids
+            session_tag_ids=session_tag_ids,
+            courses=fetch_all_courses(),
+            locations=fetch_all_locations(),
         )
 
     @app.route("/sessions/<int:session_id>/delete", methods=['POST'])

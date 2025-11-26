@@ -13,13 +13,11 @@
         <div class="login-box">
             <p class="intro-text">Find, join, or create study sessions on the NYU Tandon Campus.</p>
             {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    <ul class="flash-messages">
-                        {% for category, message in messages %}
-                            <li class="{{ category }}">{{ message }}</li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
+                <ul class="flash-messages">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
             {% endwith %}
             <form action="{{ url_for('login') }}" method="POST">
                 <input type="email" name="email" placeholder="Email" required>

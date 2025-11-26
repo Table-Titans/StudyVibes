@@ -310,11 +310,6 @@ insert_attendance_query = text("""
     VALUES (:user_id, :session_id)
 """)
 
-insert_resource_query = text("""
-    INSERT INTO Resource (session_id, uploaded_by, resource_name, resource_kind, resource_text, resource_hex, mime_type)
-    VALUES (:session_id, :uploaded_by, :resource_name, :resource_kind, :resource_text, :resource_hex, :mime_type)
-""")
-
 insert_resource_payload_query = text("""
     INSERT INTO Resource (session_id, uploaded_by, resource_name, resource_kind, resource_text, resource_hex, mime_type)
     VALUES (:session_id, :uploaded_by, :resource_name, :resource_kind, :resource_text, :resource_hex, :mime_type)

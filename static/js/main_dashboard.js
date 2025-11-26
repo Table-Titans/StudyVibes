@@ -13,9 +13,17 @@ document.addEventListener('DOMContentLoaded', function() {
             this.disabled = true;
             fetch(`/join_session/${sessionId}`, {
                 method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
                 // Reload the page on success
-                .then(window.location.reload())
+                .then(response => {
+                    if (!response.ok) {
+                        this.disabled = false;
+                        alert('You already joined this session.');
+                        return;
+                    }
+                    window.location.reload();
+                })
 
                 // Re-enable the button and show an error on failure
                 .catch(error => {
@@ -42,7 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
             })
                 // Reload the page on success
-                .then(window.location.reload())
+                .then(() => window.location.reload())
 
                 // Re-enable the button and show an error on failure
                 .catch(error => {
@@ -93,6 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchBar = document.getElementById('searchBar');
     const filterTag = document.getElementById('filterTag');
     
+    // Apply filters when called
     function applyFilters() {
         const courseFilter = document.getElementById('filterCourse').value.toLowerCase();
         const locationFilter = document.getElementById('filterLocation').value.toLowerCase();
@@ -106,6 +115,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const noResultsMessage = document.getElementById('noResultsMessage');
         let visibleCount = 0;
         
+        // Assign session card attributes for filtering
         sessionCards.forEach(card => {
             const courseName = card.getAttribute('data-course-name').toLowerCase();
             const locationAddress = card.getAttribute('data-location-address').toLowerCase();
@@ -116,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const cardTags = cardTagsValue ? cardTagsValue.toLowerCase().split(',') : [];
             const cardText = card.textContent.toLowerCase();
             
-            // Check if card matches all filters
+            // Check if card matches all the filters
             const matchesCourse = !courseFilter || courseName.includes(courseFilter);
             const matchesLocation = !locationFilter || locationAddress.includes(locationFilter);
             const matchesYear = !yearFilter || courseYear === yearFilter;
@@ -125,6 +135,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const matchesTag = !tagFilter || cardTags.includes(tagFilter);
             const matchesSearch = !searchQuery || cardText.includes(searchQuery);
             
+            // If all of the filters match, display the card; otherwise, hide it
             if (matchesCourse && matchesLocation && matchesYear && matchesTerm && matchesProfessor && matchesTag && matchesSearch) {
                 card.style.display = 'flex';
                 visibleCount++;
@@ -132,13 +143,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 card.style.display = 'none';
             }
         });
-        
-        // Show/hide no results message
-        if (noResultsMessage) {
-            noResultsMessage.style.display = visibleCount === 0 ? 'block' : 'none';
-        }
     }
     
+    // Clear the filters when called
     function clearFilters() {
         document.getElementById('filterCourse').value = '';
         document.getElementById('filterLocation').value = '';
@@ -149,6 +156,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (searchBar) searchBar.value = '';
         
         applyFilters();
+    }
+    // Clear filters button
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', clearFilters);
     }
     
     // Apply filters when search bar changes
