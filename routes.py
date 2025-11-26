@@ -625,6 +625,24 @@ def register_routes(app, db):
         flash('Resource uploaded.', 'success')
         return redirect(url_for('view_session', session_id=session_id))
 
+    @app.route("/tasks/send_due_reminders")
+    def send_due_reminders():
+        rows = db.session.execute(queries.due_reminders_query).fetchall()
+        sent = 0
+        for row in rows:
+            start_display = row.start_time.strftime("%b %d, %I:%M %p") if row.start_time else "soon"
+            subject = "Study session reminder"
+            body = f"Your study session is starting at {start_display}.\n\nDetails: {row.description or 'Study session'}"
+            ok = send_email(row.email, subject, body)
+            if ok:
+                db.session.execute(
+                    queries.mark_reminder_sent_query,
+                    {"reminder_id": row.reminder_id},
+                )
+                sent += 1
+        db.session.commit()
+        return jsonify({"sent": sent})
+
     @app.route("/join_session/<int:session_id>", methods=['POST'])
     @login_required
     def join_session(session_id):
