@@ -1,5 +1,4 @@
 import os
-import time
 import smtplib
 from email.mime.text import MIMEText
 
@@ -25,21 +24,22 @@ def send_email(to_address, subject, body):
 def main():
     app = create_app()
     with app.app_context():
-        while True:
-            rows = db.session.execute(queries.due_reminders_query).fetchall()
-            for row in rows:
-                start_display = (
-                    row.start_time.strftime("%b %d, %I:%M %p") if row.start_time else "soon"
+        rows = db.session.execute(queries.due_reminders_query).fetchall()
+        sent = 0
+        for row in rows:
+            start_display = (
+                row.start_time.strftime("%b %d, %I:%M %p") if row.start_time else "soon"
+            )
+            subject = "Study session reminder"
+            body = f"Your study session is starting at {start_display}.\n\nDetails: {row.description or 'Study session'}"
+            if send_email(row.email, subject, body):
+                db.session.execute(
+                    queries.mark_reminder_sent_query,
+                    {"reminder_id": row.reminder_id},
                 )
-                subject = "Study session reminder"
-                body = f"Your study session is starting at {start_display}.\n\nDetails: {row.description or 'Study session'}"
-                if send_email(row.email, subject, body):
-                    db.session.execute(
-                        queries.mark_reminder_sent_query,
-                        {"reminder_id": row.reminder_id},
-                    )
-            db.session.commit()
-            time.sleep(300)
+                sent += 1
+        db.session.commit()
+        print(f"Reminders processed: {len(rows)}, sent: {sent}")
 
 
 if __name__ == "__main__":
