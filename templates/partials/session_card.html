@@ -43,12 +43,12 @@
      data-session-id="{{ session.id }}"
      data-course-id="{{ session.course_id if session.course_id else '' }}"
      data-location-id="{{ session.location_id if session.location_id else '' }}"
-     data-course-name="{{ course.title if course else '' }}"
-     data-location-address="{{ location.address if location else '' }}"
-     data-course-year="{{ course.year if course else '' }}"
-     data-course-term="{{ course.term if course else '' }}"
-     data-professor-name="{{ course.professor_name if course else '' }}"
-     data-tags="{{ tag_names.items|join(',') }}">
+     data-course-name="{{ (course.title if course else session.title) or '' }}"
+     data-location-address="{{ (location.address if location else session.location) or '' }}"
+     data-course-year="{{ course.year if course else (session.year or '') }}"
+     data-course-term="{{ course.term if course else (session.term or '') }}"
+     data-professor-name="{{ course.professor_name if course else (session.professor_name or '') }}"
+     data-tags="{{ tag_names|join(',') }}">
     <a class="session-card-link" href="{{ url_for('view_session', session_id=session.id) }}">
         <div class="session_info">
             <div class="session-chill-emoji" aria-label="Chill level">

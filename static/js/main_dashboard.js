@@ -117,11 +117,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Assign session card attributes for filtering
         sessionCards.forEach(card => {
-            const courseName = card.getAttribute('data-course-name').toLowerCase();
-            const locationAddress = card.getAttribute('data-location-address').toLowerCase();
-            const courseYear = card.getAttribute('data-course-year');
-            const courseTerm = card.getAttribute('data-course-term');
-            const professorName = card.getAttribute('data-professor-name').toLowerCase();
+            const courseName = (card.getAttribute('data-course-name') || '').toLowerCase();
+            const locationAddress = (card.getAttribute('data-location-address') || '').toLowerCase();
+            const courseYear = card.getAttribute('data-course-year') || '';
+            const courseTerm = card.getAttribute('data-course-term') || '';
+            const professorName = (card.getAttribute('data-professor-name') || '').toLowerCase();
             const cardTagsValue = card.getAttribute('data-tags') || '';
             const cardTags = cardTagsValue ? cardTagsValue.toLowerCase().split(',') : [];
             const cardText = card.textContent.toLowerCase();
@@ -143,6 +143,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 card.style.display = 'none';
             }
         });
+
+        if (noResultsMessage) {
+            noResultsMessage.style.display = visibleCount === 0 ? 'block' : 'none';
+        }
     }
     
     // Clear the filters when called
